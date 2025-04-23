@@ -3,7 +3,7 @@
 # Created Date: Tuesday, April 8th 2025
 # Author: Zihan
 # -----
-# Last Modified: Wednesday, 23rd April 2025 4:56:49 pm
+# Last Modified: Wednesday, 23rd April 2025 5:24:38 pm
 # Modified By: the developer formerly known as Zihan at <wzh4464@gmail.com>
 # -----
 # HISTORY:
@@ -29,6 +29,7 @@ from threeDCSQ.transformation.SH_represention import get_SH_coefficient_of_embry
 # Additional imports for parallel SH coefficient calculation and npy saving
 from multiprocessing import Pool
 import pandas as pd
+from tqdm import tqdm
 
 
 def process_single_frame(file_path, embryo_name):
@@ -307,34 +308,63 @@ def main():
 
 
 # Helper and parallel function for SH coefficient calculation and npy saving
-def process_single_cell_sh(args):
+def process_single_frame_sh(args):
+    """Process all cells in a single frame."""
     (
-        embryo_array,
-        this_cell_label,
+        niigz_path,
         sample_N,
         surface_average_num,
         lmax,
         number_cell_affine_table,
+        saving_path_root,
     ) = args
-    if this_cell_label == 0:
-        return None
+    
     try:
-        cell_surface, center = cell_f.nii_get_cell_surface(
-            embryo_array, this_cell_label
-        )
-        points_membrane_local = cell_surface - center
-        from threeDCSQ.transformation.SH_represention import do_sampling_with_interval
-        from threeDCSQ.utils import sh_cooperation
-        import pyshtools as pysh
+        # Extract timepoint info
+        filename = os.path.basename(niigz_path)
+        parts = filename.split("_")
+        if len(parts) >= 3:
+            embryo_name = parts[0]
+            tp_str = parts[-2]
+        else:
+            return None
+            
+        # Load and process embryo data
+        embryo_array = general_f.load_nitf2_img(niigz_path).get_fdata().astype(int)
+        cell_keys = np.unique(embryo_array)
+        cell_keys = [k for k in cell_keys if k != 0]  # Remove background label
 
-        griddata, _ = do_sampling_with_interval(
-            sample_N, points_membrane_local, surface_average_num
-        )
-        sh_coefficient = pysh.expand.SHExpandDH(griddata, sampling=2, lmax_calc=lmax)
-        cilm = sh_cooperation.flatten_clim(sh_coefficient)
-        return (this_cell_label, cilm)
+        # Process all cells in this frame with progress bar
+        results = []
+        for label in tqdm(cell_keys, desc=f"Frame {tp_str}", leave=False):
+            try:
+                cell_surface, center = cell_f.nii_get_cell_surface(embryo_array, label)
+                points_membrane_local = cell_surface - center
+                
+                from threeDCSQ.transformation.SH_represention import do_sampling_with_interval
+                from threeDCSQ.utils import sh_cooperation
+                import pyshtools as pysh
+
+                griddata, _ = do_sampling_with_interval(
+                    sample_N, points_membrane_local, surface_average_num
+                )
+                sh_coefficient = pysh.expand.SHExpandDH(griddata, sampling=2, lmax_calc=lmax)
+                cilm = sh_cooperation.flatten_clim(sh_coefficient)
+                results.append((label, cilm))
+            except Exception as e:
+                continue
+
+        # Save results for this frame
+        timepoint_dir = os.path.join(saving_path_root, f"tp_{tp_str}")
+        os.makedirs(timepoint_dir, exist_ok=True)
+        
+        for label, cilm in results:
+            name = number_cell_affine_table.get(label, f"cell_{label}")
+            save_path = os.path.join(timepoint_dir, f"{embryo_name}_{tp_str}_{name}_l{lmax+1}.npy")
+            np.save(save_path, np.array(cilm))
+            
+        return tp_str, len(results)
     except Exception as e:
-        print(f"Error processing cell {this_cell_label}: {str(e)}")
         return None
 
 
@@ -353,73 +383,56 @@ def get_SH_coefficient_of_embryo_parallel_npy(
     import numpy as np
     from threeDCSQ.transformation.SH_represention import get_flatten_ldegree_morder
     from threeDCSQ.utils import sh_cooperation
+    from tqdm import tqdm
 
+    print(f"\nStarting SH coefficient calculation...")
+    print(f"Input directory: {embryos_path_root}")
+    print(f"Output directory: {saving_path_root}")
+    print(f"Spherical harmonic degree: {lmax}")
+    print(f"Sample points per cell: {sample_N}")
+    
     column_indices = get_flatten_ldegree_morder(lmax)
     number_cell_affine_table, _ = cell_f.get_cell_name_affine_table(
         path=name_dictionary_path
     )
     
-    # Get all nii.gz files and print debug info
+    # Get all nii.gz files
     niigz_files_this = sorted(glob.glob(os.path.join(embryos_path_root, "*.nii.gz")))
-    print(f"Found {len(niigz_files_this)} nii.gz files in {embryos_path_root}")
-    print("Files:", niigz_files_this)
+    print(f"\nFound {len(niigz_files_this)} frames to process")
 
     # Create saving directory if it doesn't exist
     os.makedirs(saving_path_root, exist_ok=True)
     
-    # Process each timepoint
-    for niigz_path in niigz_files_this:
-        # Extract timepoint info with more robust parsing
-        filename = os.path.basename(niigz_path)
-        parts = filename.split("_")
-        if len(parts) >= 3:  # Changed from 2 to 3 to get the timepoint number
-            embryo_name = parts[0]
-            tp_str = parts[-2]  # Changed to get the timepoint number
-        else:
-            print(f"Warning: Unexpected filename format: {filename}")
-            continue
-            
-        print(f"\nProcessing timepoint {tp_str} from file {filename}")
-        
-        # Load and process embryo data
-        embryo_array = general_f.load_nitf2_img(niigz_path).get_fdata().astype(int)
-        cell_keys = np.unique(embryo_array)
-        print(f"Found {len(cell_keys)} cells in timepoint {tp_str}")
+    # Prepare arguments for parallel processing
+    args_list = [
+        (
+            niigz_path,
+            sample_N,
+            surface_average_num,
+            lmax,
+            number_cell_affine_table,
+            saving_path_root,
+        )
+        for niigz_path in niigz_files_this
+    ]
 
-        # Prepare arguments for parallel processing
-        args_list = [
-            (
-                embryo_array,
-                label,
-                sample_N,
-                surface_average_num,
-                lmax,
-                number_cell_affine_table,
-            )
-            for label in cell_keys
-            if label
-        ]
+    # Process frames in parallel with progress bar
+    num_cpus = min(20, mp.cpu_count())
+    print(f"\nUsing {num_cpus} CPU cores for parallel processing")
+    
+    with mp.Pool(num_cpus) as pool:
+        results = list(tqdm(
+            pool.imap(process_single_frame_sh, args_list),
+            total=len(niigz_files_this),
+            desc="Processing frames"
+        ))
 
-        # Process cells in parallel
-        with Pool() as pool:
-            results = pool.map(process_single_cell_sh, args_list)
-
-        # Save results for each cell
-        for result in results:
-            if result:
-                label, cilm = result
-                name = number_cell_affine_table.get(label, f"cell_{label}")
-                
-                # Create a subdirectory for each timepoint
-                timepoint_dir = os.path.join(saving_path_root, f"tp_{tp_str}")
-                os.makedirs(timepoint_dir, exist_ok=True)
-                
-                # Save with timepoint in both directory and filename
-                save_path = os.path.join(timepoint_dir, f"{embryo_name}_{tp_str}_{name}_l{lmax+1}.npy")
-                np.save(save_path, np.array(cilm))
-                print(f"Saved SH coefficients for cell {name} at timepoint {tp_str} to {save_path}")
-
-    print("\nProcessing completed. All timepoints have been processed and saved.")
+    # Print summary
+    successful_frames = [r for r in results if r is not None]
+    print(f"\nProcessing completed:")
+    print(f"Successfully processed {len(successful_frames)} frames out of {len(niigz_files_this)}")
+    total_cells = sum(cell_count for _, cell_count in successful_frames)
+    print(f"Total cells processed: {total_cells}")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from zelin_feature import get_SH_coefficient_of_embryo
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 from functools import partial
+import nibabel as nib
 
 def process_single_timepoint(source_file, target_cell, sample_N, lmax, name_dictionary_path, test_data_dir, test_output_dir):
     """Process a single timepoint file"""
@@ -18,18 +19,25 @@ def process_single_timepoint(source_file, target_cell, sample_N, lmax, name_dict
     # Copy the timepoint file
     shutil.copy(source_file, timepoint_dir)
 
+    # Create output directory for this cell
+    cell_output_dir = test_output_dir / target_cell
+    cell_output_dir.mkdir(exist_ok=True)
+
     # Calculate SH coefficients using non-parallel version
     get_SH_coefficient_of_embryo(
         embryos_path_root=str(timepoint_dir),
-        saving_path_root=str(test_output_dir),
+        saving_path_root=str(cell_output_dir),
         sample_N=sample_N,
         lmax=lmax,
         name_dictionary_path=name_dictionary_path,
-        surface_average_num=3
+        surface_average_num=3,
+        target_cell=target_cell  # Add target cell parameter
     )
 
-    if cell_files := list(test_output_dir.glob(f"**/*{target_cell}*.npy")):
-        data = np.load(cell_files[0])
+    # Check if the cell's data was saved for this timepoint
+    cell_file = cell_output_dir / f"{target_cell}_{timepoint}_l{lmax+1}.npy"
+    if cell_file.exists():
+        data = np.load(cell_file)
         return timepoint, data
     return timepoint, None
 
@@ -99,16 +107,16 @@ class TestSHCoefficients(unittest.TestCase):
     def test_cell_across_timepoints_parallel(self):
         """Test SH coefficient calculation for a specific cell across all timepoints using parallel processing"""
         # Parameters
-        target_cell = "MSaaaap"  # Example cell to track
+        target_cell = "AB"  # Changed from MSaaaap to AB
         sample_N = 30
         lmax = 14
         name_dictionary_path = "DATA/name_dictionary.csv"
 
-        # Get all timepoint files
+        # Get all timepoint files and take only first 10
         source_dir = Path("DATA/SegmentCellUnified/WT_Sample1LabelUnified")
-        timepoint_files = sorted(source_dir.glob("*_segCell.nii.gz"))
+        timepoint_files = sorted(source_dir.glob("*_segCell.nii.gz"))[:10]
 
-        print(f"\nProcessing cell {target_cell} across {len(timepoint_files)} timepoints in parallel")
+        print(f"\nProcessing cell {target_cell} across first {len(timepoint_files)} timepoints in parallel")
 
         # Create output directory for this cell
         cell_output_dir = self.test_output_dir / target_cell
@@ -143,6 +151,7 @@ class TestSHCoefficients(unittest.TestCase):
                 print(f"Found cell in timepoint {timepoint}, SH coefficients shape: {data.shape}")
             else:
                 print(f"Cell not found in timepoint {timepoint}")
+                print(f"Found {results}")
 
         # Convert results to DataFrame
         if sh_coefficients:
