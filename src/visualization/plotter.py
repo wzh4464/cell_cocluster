@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from read_data import load_nifti_file, get_all_nifti_files
+from ..data.reader import load_nifti_file, get_all_nifti_files
 
 def normalize_coordinates(x, y, z):
     """Normalize coordinates to [0,1] range."""

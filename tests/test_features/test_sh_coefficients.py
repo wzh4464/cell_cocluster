@@ -3,11 +3,12 @@ import os
 import numpy as np
 from pathlib import Path
 import shutil
-from zelin_feature import get_SH_coefficient_of_embryo
+from src.features.zelin import get_SH_coefficient_of_embryo
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 from functools import partial
 import nibabel as nib
+import glob
 
 def process_single_timepoint(source_file, target_cell, sample_N, lmax, name_dictionary_path, test_data_dir, test_output_dir):
     """Process a single timepoint file"""
@@ -46,13 +47,13 @@ class TestSHCoefficients(unittest.TestCase):
     def setUpClass(cls):
         """Set up test environment"""
         # Create test directories
-        cls.test_data_dir = Path("test_data")
-        cls.test_output_dir = Path("test_output")
+        cls.test_data_dir = Path("test_data").resolve()
+        cls.test_output_dir = Path("test_output").resolve()
         cls.test_data_dir.mkdir(exist_ok=True)
         cls.test_output_dir.mkdir(exist_ok=True)
 
         # Copy a single nii.gz file for testing (using the first available timepoint)
-        source_file = Path("DATA/SegmentCellUnified/WT_Sample1LabelUnified/WT_Sample1LabelUnified_120_segCell.nii.gz")
+        source_file = Path("DATA/SegmentCellUnified/WT_Sample1LabelUnified/WT_Sample1LabelUnified_120_segCell.nii.gz").resolve()
         if source_file.exists():
             shutil.copy(source_file, cls.test_data_dir)
             print(f"Copied test file: {source_file}")
@@ -62,7 +63,7 @@ class TestSHCoefficients(unittest.TestCase):
     def test_single_timepoint(self):  # sourcery skip: extract-method
         """Test SH coefficient calculation for a single timepoint"""
         # Copy a single nii.gz file for testing
-        source_file = Path("DATA/SegmentCellUnified/WT_Sample1LabelUnified/WT_Sample1LabelUnified_120_segCell.nii.gz")
+        source_file = Path("DATA/SegmentCellUnified/WT_Sample1LabelUnified/WT_Sample1LabelUnified_120_segCell.nii.gz").resolve()
         if source_file.exists():
             shutil.copy(source_file, self.test_data_dir)
             print(f"Copied test file: {source_file}")
@@ -72,20 +73,48 @@ class TestSHCoefficients(unittest.TestCase):
         # Parameters for testing
         sample_N = 30
         lmax = 14
-        name_dictionary_path = "DATA/name_dictionary.csv"
+        name_dictionary_path = Path("DATA/name_dictionary.csv").resolve()
+
+        print(f"\nTest parameters:")
+        print(f"Sample N: {sample_N}")
+        print(f"Lmax: {lmax}")
+        print(f"Name dictionary path: {name_dictionary_path}")
+        print(f"Test data dir: {self.test_data_dir}")
+        print(f"Test output dir: {self.test_output_dir}")
+
+        # Check if input files exist
+        nii_files = list(self.test_data_dir.glob("*.nii.gz"))
+        print(f"\nFound {len(nii_files)} NIfTI files:")
+        for file in nii_files:
+            print(f"  - {file}")
+
+        if not nii_files:
+            self.fail("No NIfTI files found in test data directory")
+
+        if not name_dictionary_path.exists():
+            self.fail(f"Name dictionary file not found: {name_dictionary_path}")
 
         # Run the function
-        get_SH_coefficient_of_embryo(
-            embryos_path_root=str(self.test_data_dir),
-            saving_path_root=str(self.test_output_dir),
-            sample_N=sample_N,
-            lmax=lmax,
-            name_dictionary_path=name_dictionary_path,
-            surface_average_num=3
-        )
+        print("\nRunning get_SH_coefficient_of_embryo...")
+        try:
+            get_SH_coefficient_of_embryo(
+                embryos_path_root=str(self.test_data_dir),
+                saving_path_root=str(self.test_output_dir),
+                sample_N=sample_N,
+                lmax=lmax,
+                name_dictionary_path=str(name_dictionary_path),
+                surface_average_num=3
+            )
+        except Exception as e:
+            print(f"Error running get_SH_coefficient_of_embryo: {str(e)}")
+            raise
 
         # Check if output files were created
         output_files = list(self.test_output_dir.glob("**/*.npy"))
+        print(f"\nFound {len(output_files)} output files:")
+        for file in output_files:
+            print(f"  - {file}")
+
         self.assertGreater(len(output_files), 0, "No output files were created")
 
         # Check the content of the first output file
@@ -98,11 +127,8 @@ class TestSHCoefficients(unittest.TestCase):
 
             # Print some information about the test
             print(f"\nTest completed successfully:")
-            print(f"Number of output files: {len(output_files)}")
-            print(f"First output file: {output_files[0]}")
-            print(f"SH coefficients shape: {data.shape}")
-            print(f"SH coefficients size: {data.size}")
-            print(f"SH coefficients range: [{np.min(data)}, {np.max(data)}]")
+            print(f"Output file shape: {data.shape}")
+            print(f"Expected size: {expected_size}")
 
     def test_cell_across_timepoints_parallel(self):
         """Test SH coefficient calculation for a specific cell across all timepoints using parallel processing"""
@@ -177,8 +203,10 @@ class TestSHCoefficients(unittest.TestCase):
     def tearDownClass(cls):
         """Clean up test environment"""
         # Remove test directories
-        shutil.rmtree(cls.test_data_dir, ignore_errors=True)
-        shutil.rmtree(cls.test_output_dir, ignore_errors=True)
+        if cls.test_data_dir.exists():
+            shutil.rmtree(cls.test_data_dir)
+        if cls.test_output_dir.exists():
+            shutil.rmtree(cls.test_output_dir)
 
 if __name__ == '__main__':
     unittest.main() 
