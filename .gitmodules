@@ -1,0 +1,4 @@
+
+[submodule "threeDCSQ"]
+	path = threeDCSQ
+	url = git@github.com:wzh4464/threeDCSQ.git
