@@ -3,7 +3,7 @@
 # Created Date: Tuesday, April 8th 2025
 # Author: Zihan
 # -----
-# Last Modified: Wednesday, 23rd April 2025 5:24:38 pm
+# Last Modified: Wednesday, 23rd April 2025 7:00:24 pm
 # Modified By: the developer formerly known as Zihan at <wzh4464@gmail.com>
 # -----
 # HISTORY:
@@ -294,15 +294,14 @@ def main():
     # Step 2: Calculate volume and surface areas
     calculate_volume_surface(embryo_path)
 
-    # Step 3: Calculate spherical harmonic coefficients
-    calculate_spherical_harmonics(embryo_path, l_degree=25)
-
-    # Step 4: Cluster cells by shape
-    cluster_cells_by_shape(embryo_path, used_degree=9, cluster_num=12)
-
-    # Step 5 (Optional): Analyze a specific cell
-    # Note: Replace '001' with your frame number and 123 with an actual cell label
-    analyze_specific_cell(embryo_path, "001", 123)
+    # Step 3: Calculate spherical harmonic coefficients using parallel processing
+    get_SH_coefficient_of_embryo_parallel_npy(
+        embryos_path_root=embryo_path,
+        saving_path_root="DATA/spharm",
+        sample_N=30,
+        lmax=14,
+        name_dictionary_path="DATA/name_dictionary.csv",
+    )
 
     print("All analyses completed. Results are saved in the DATA directory.")
 
@@ -318,29 +317,35 @@ def process_single_frame_sh(args):
         number_cell_affine_table,
         saving_path_root,
     ) = args
-    
+
     try:
         # Extract timepoint info
         filename = os.path.basename(niigz_path)
         parts = filename.split("_")
-        if len(parts) >= 3:
-            embryo_name = parts[0]
-            tp_str = parts[-2]
-        else:
+        if len(parts) < 3:
             return None
-            
+
+        embryo_name = parts[0]
+        tp_str = parts[-2]
         # Load and process embryo data
         embryo_array = general_f.load_nitf2_img(niigz_path).get_fdata().astype(int)
         cell_keys = np.unique(embryo_array)
         cell_keys = [k for k in cell_keys if k != 0]  # Remove background label
 
-        # Process all cells in this frame with progress bar
+        # Process all cells in this frame
         results = []
-        for label in tqdm(cell_keys, desc=f"Frame {tp_str}", leave=False):
+        for label in cell_keys:
             try:
+                # Get cell name from label
+                name = number_cell_affine_table.get(label, f"cell_{label}")
+
+                # Create cell directory if it doesn't exist
+                cell_dir = os.path.join(saving_path_root, name)
+                os.makedirs(cell_dir, exist_ok=True)
+
                 cell_surface, center = cell_f.nii_get_cell_surface(embryo_array, label)
                 points_membrane_local = cell_surface - center
-                
+
                 from threeDCSQ.transformation.SH_represention import do_sampling_with_interval
                 from threeDCSQ.utils import sh_cooperation
                 import pyshtools as pysh
@@ -350,21 +355,19 @@ def process_single_frame_sh(args):
                 )
                 sh_coefficient = pysh.expand.SHExpandDH(griddata, sampling=2, lmax_calc=lmax)
                 cilm = sh_cooperation.flatten_clim(sh_coefficient)
-                results.append((label, cilm))
+
+                # Save cell data in its own directory
+                cell_path = os.path.join(cell_dir, f"{name}_{tp_str}_l{lmax+1}.npy")
+                np.save(cell_path, np.array(cilm))
+
+                results.append((name, tp_str))
             except Exception as e:
+                print(f"Error processing cell {label} ({name}) in frame {tp_str}: {str(e)}")
                 continue
 
-        # Save results for this frame
-        timepoint_dir = os.path.join(saving_path_root, f"tp_{tp_str}")
-        os.makedirs(timepoint_dir, exist_ok=True)
-        
-        for label, cilm in results:
-            name = number_cell_affine_table.get(label, f"cell_{label}")
-            save_path = os.path.join(timepoint_dir, f"{embryo_name}_{tp_str}_{name}_l{lmax+1}.npy")
-            np.save(save_path, np.array(cilm))
-            
         return tp_str, len(results)
     except Exception as e:
+        print(f"Error processing frame {niigz_path}: {str(e)}")
         return None
 
 
@@ -376,6 +379,7 @@ def get_SH_coefficient_of_embryo_parallel_npy(
     name_dictionary_path,
     surface_average_num=3,
 ):
+    """Calculate SH coefficients for all cells in an embryo using parallel processing."""
     import pandas as pd
     from multiprocessing import Pool
     import glob
@@ -391,7 +395,7 @@ def get_SH_coefficient_of_embryo_parallel_npy(
     print(f"Spherical harmonic degree: {lmax}")
     print(f"Sample points per cell: {sample_N}")
     
-    column_indices = get_flatten_ldegree_morder(lmax)
+    # Get cell name mapping
     number_cell_affine_table, _ = cell_f.get_cell_name_affine_table(
         path=name_dictionary_path
     )
@@ -417,7 +421,7 @@ def get_SH_coefficient_of_embryo_parallel_npy(
     ]
 
     # Process frames in parallel with progress bar
-    num_cpus = min(20, mp.cpu_count())
+    num_cpus = min(48, mp.cpu_count())
     print(f"\nUsing {num_cpus} CPU cores for parallel processing")
     
     with mp.Pool(num_cpus) as pool:
