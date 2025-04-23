@@ -19,4 +19,4 @@ def load_array(path):
 
 def calculate_distance(point1, point2):
     """Calculate Euclidean distance between two points."""
-    return np.linalg.norm(np.array(point1) - np.array(point2)) 
+    return np.linalg.norm(np.array(point1) - np.array(point2))

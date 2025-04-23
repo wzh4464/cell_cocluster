@@ -3,7 +3,7 @@
 # Created Date: Wednesday, March 26th 2025
 # Author: Zihan
 # -----
-# Last Modified: Wednesday, 23rd April 2025 10:42:56 pm
+# Last Modified: Wednesday, 23rd April 2025 10:46:53 pm
 # Modified By: the developer formerly known as Zihan at <wzh4464@gmail.com>
 # -----
 # HISTORY:
@@ -19,20 +19,58 @@ import os
 import numpy as np
 import nibabel as nib
 from pathlib import Path
+from typing import Union, List, Dict, Any
 
-def load_nifti_file(file_path):
-    """Load a NIfTI file and return its data as a numpy array."""
+def load_nifti_file(file_path: Union[str, Path]) -> np.ndarray:
+    """
+    Load a NIfTI file and return its data as a numpy array.
+    
+    Args:
+        file_path: Path to the NIfTI file
+        
+    Returns:
+        numpy.ndarray: The volume data
+        
+    Raises:
+        FileNotFoundError: If the file does not exist
+    """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
     return nib.load(file_path).get_fdata()
 
-def get_all_nifti_files(data_dir):
-    """Get all NIfTI files in the specified directory."""
+def save_nifti_file(data: np.ndarray, file_path: Union[str, Path]) -> None:
+    """
+    Save a numpy array as a NIfTI file.
+    
+    Args:
+        data: The volume data to save
+        file_path: Path where to save the NIfTI file
+    """
+    nib.save(nib.Nifti1Image(data, np.eye(4)), str(file_path))
+
+def get_all_nifti_files(data_dir: Union[str, Path]) -> List[Path]:
+    """
+    Get all NIfTI files in the specified directory.
+    
+    Args:
+        data_dir: Directory containing NIfTI files
+        
+    Returns:
+        List[Path]: Sorted list of NIfTI file paths
+    """
     data_path = Path(data_dir)
     return sorted(data_path.glob("*_segCell.nii.gz"))
 
-def process_nifti_files(data_dir):
-    """Process all NIfTI files in the directory."""
+def process_nifti_files(data_dir: Union[str, Path]) -> Dict[str, np.ndarray]:
+    """
+    Process all NIfTI files in the directory.
+    
+    Args:
+        data_dir: Directory containing NIfTI files
+        
+    Returns:
+        Dict[str, np.ndarray]: Dictionary mapping frame numbers to volume data
+    """
     nifti_files = get_all_nifti_files(data_dir)
     
     # Dictionary to store all volumes

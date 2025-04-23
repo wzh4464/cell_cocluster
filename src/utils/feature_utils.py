@@ -3,7 +3,7 @@ from pathlib import Path
 import multiprocessing as mp
 from functools import partial
 from typing import List, Dict, Any, Callable, Union
-import nibabel as nib
+from ..data.reader import load_nifti_file
 
 def process_files_parallel(
     file_paths: List[Path],
@@ -25,11 +25,11 @@ def process_files_parallel(
     """
     if n_workers is None:
         n_workers = min(20, mp.cpu_count())  # 最多使用20个进程
-        
+
     with mp.Pool(n_workers) as pool:
         process_func_with_args = partial(process_func, **kwargs)
         results = pool.map(process_func_with_args, file_paths)
-        
+
     return [r for r in results if r is not None]
 
 def save_features(
@@ -66,18 +66,6 @@ def save_features(
     }
     metadata_file = cell_dir / f"{cell_id}_{timepoint}_{feature_type}_metadata.npy"
     np.save(metadata_file, metadata)
-
-def load_nifti_volume(file_path: Union[str, Path]) -> np.ndarray:
-    """
-    加载NIfTI文件并返回体积数据
-    
-    Args:
-        file_path: NIfTI文件路径
-        
-    Returns:
-        体积数据数组
-    """
-    return nib.load(str(file_path)).get_fdata()
 
 def get_cell_labels(volume: np.ndarray) -> np.ndarray:
     """

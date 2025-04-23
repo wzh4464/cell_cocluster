@@ -2,12 +2,11 @@ import numpy as np
 import pandas as pd
 from scipy import ndimage
 from pathlib import Path
-from ..data.reader import get_all_nifti_files
+from ..data.reader import get_all_nifti_files, load_nifti_file
 from ..utils.file_utils import get_timepoint_from_filename, get_cell_id_from_label
 from ..utils.feature_utils import (
     process_files_parallel,
     save_features,
-    load_nifti_volume,
     get_cell_labels,
     process_single_cell
 )
@@ -48,17 +47,15 @@ def calculate_cell_features(volume, label):
 def calculate_velocity(prev_centroid, curr_centroid):
     """
     计算细胞在两个时间点之间的速度
-    
+
     Args:
         prev_centroid (numpy.ndarray): 前一个时间点的质心坐标
         curr_centroid (numpy.ndarray): 当前时间点的质心坐标
-        
+
     Returns:
         numpy.ndarray: 3D速度向量 [vx, vy, vz]
     """
-    if prev_centroid is None:
-        return np.zeros(3)
-    return curr_centroid - prev_centroid
+    return np.zeros(3) if prev_centroid is None else curr_centroid - prev_centroid
 
 def calculate_acceleration(prev_velocity, curr_velocity):
     """
@@ -87,7 +84,7 @@ def process_single_timepoint(file_path, target_cell=None):
         tuple: (timepoint, processed_cells)
     """
     timepoint = get_timepoint_from_filename(file_path)
-    volume = load_nifti_volume(file_path)
+    volume = load_nifti_file(file_path)
     labels = get_cell_labels(volume)
     
     processed_cells = []
