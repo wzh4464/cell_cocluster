@@ -3,7 +3,7 @@
 # Created Date: Tuesday, April 8th 2025
 # Author: Zihan
 # -----
-# Last Modified: Wednesday, 23rd April 2025 12:26:12 pm
+# Last Modified: Wednesday, 23rd April 2025 4:56:49 pm
 # Modified By: the developer formerly known as Zihan at <wzh4464@gmail.com>
 # -----
 # HISTORY:
@@ -250,7 +250,7 @@ def analyze_specific_cell(embryo_path, frame_num, cell_label):
     ax2 = fig.add_subplot(122, projection="3d")
     draw_f.draw_3D_points(
         reconstruction,
-        fig_name="球谐重建 (度数: {})".format(l_degree),
+        fig_name=f"球谐重建 (度数: {l_degree})",
         ax=ax2,
         cmap="plasma",
     )
@@ -358,15 +358,35 @@ def get_SH_coefficient_of_embryo_parallel_npy(
     number_cell_affine_table, _ = cell_f.get_cell_name_affine_table(
         path=name_dictionary_path
     )
+    
+    # Get all nii.gz files and print debug info
     niigz_files_this = sorted(glob.glob(os.path.join(embryos_path_root, "*.nii.gz")))
+    print(f"Found {len(niigz_files_this)} nii.gz files in {embryos_path_root}")
+    print("Files:", niigz_files_this)
 
+    # Create saving directory if it doesn't exist
+    os.makedirs(saving_path_root, exist_ok=True)
+    
+    # Process each timepoint
     for niigz_path in niigz_files_this:
-        embryo_name, tp_str = os.path.basename(niigz_path).split(".")[0].split("_")[:2]
+        # Extract timepoint info with more robust parsing
+        filename = os.path.basename(niigz_path)
+        parts = filename.split("_")
+        if len(parts) >= 3:  # Changed from 2 to 3 to get the timepoint number
+            embryo_name = parts[0]
+            tp_str = parts[-2]  # Changed to get the timepoint number
+        else:
+            print(f"Warning: Unexpected filename format: {filename}")
+            continue
+            
+        print(f"\nProcessing timepoint {tp_str} from file {filename}")
+        
+        # Load and process embryo data
         embryo_array = general_f.load_nitf2_img(niigz_path).get_fdata().astype(int)
         cell_keys = np.unique(embryo_array)
+        print(f"Found {len(cell_keys)} cells in timepoint {tp_str}")
 
-        os.makedirs(saving_path_root, exist_ok=True)
-
+        # Prepare arguments for parallel processing
         args_list = [
             (
                 embryo_array,
@@ -380,17 +400,26 @@ def get_SH_coefficient_of_embryo_parallel_npy(
             if label
         ]
 
+        # Process cells in parallel
         with Pool() as pool:
             results = pool.map(process_single_cell_sh, args_list)
 
+        # Save results for each cell
         for result in results:
             if result:
                 label, cilm = result
                 name = number_cell_affine_table.get(label, f"cell_{label}")
-                np.save(
-                    os.path.join(saving_path_root, f"{tp_str}__{name}_l{lmax+1}.npy"),
-                    np.array(cilm),
-                )
+                
+                # Create a subdirectory for each timepoint
+                timepoint_dir = os.path.join(saving_path_root, f"tp_{tp_str}")
+                os.makedirs(timepoint_dir, exist_ok=True)
+                
+                # Save with timepoint in both directory and filename
+                save_path = os.path.join(timepoint_dir, f"{embryo_name}_{tp_str}_{name}_l{lmax+1}.npy")
+                np.save(save_path, np.array(cilm))
+                print(f"Saved SH coefficients for cell {name} at timepoint {tp_str} to {save_path}")
+
+    print("\nProcessing completed. All timepoints have been processed and saved.")
 
 
 if __name__ == "__main__":
