@@ -1,0 +1,17 @@
+# Feature extraction parameters
+feature_extraction:
+  nmf_components: 5
+  cell_threshold: 0.5
+  smoothing_sigma: 1.0
+
+# Visualization parameters
+visualization:
+  colormap: viridis
+  figure_size: [10, 8]
+  dpi: 300
+
+# Data paths
+paths:
+  data_dir: "DATA"
+  output_dir: "results"
+  name_dictionary: "DATA/name_dictionary.csv" 
