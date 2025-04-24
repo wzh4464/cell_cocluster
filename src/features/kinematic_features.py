@@ -23,7 +23,11 @@ def calculate_cell_features(volume, label):
         dict: 包含以下特征的字典：
             - volume: 细胞体积（体素数）
             - surface_area: 细胞表面积（体素数）
-            - centroid_x/y/z: 细胞质心坐标
+            - centroid_x/y/z: 细胞质心坐标（像素坐标）
+            
+    Note:
+        所有特征都保存在 features.npy 文件中，元数据保存在 features_metadata.npy 文件中。
+        文件保存在 output_dir/cell_id/ 目录下，文件名格式为 {cell_id}_{timepoint}_features.npy。
     """
     # Get cell mask
     cell_mask = (volume == label)
@@ -60,17 +64,15 @@ def calculate_velocity(prev_centroid, curr_centroid):
 def calculate_acceleration(prev_velocity, curr_velocity):
     """
     计算细胞在两个时间点之间的加速度
-    
+
     Args:
         prev_velocity (numpy.ndarray): 前一个时间点的速度向量
         curr_velocity (numpy.ndarray): 当前时间点的速度向量
-        
+
     Returns:
         numpy.ndarray: 3D加速度向量 [ax, ay, az]
     """
-    if prev_velocity is None:
-        return np.zeros(3)
-    return curr_velocity - prev_velocity
+    return np.zeros(3) if prev_velocity is None else curr_velocity - prev_velocity
 
 def process_single_timepoint(file_path, target_cell=None):
     """
@@ -116,6 +118,15 @@ def extract_cell_features(data_dir, output_dir, target_cell=None, timepoints=Non
         
     Returns:
         dict: 包含处理统计信息的字典
+        
+    Note:
+        对每个细胞每个时间点，会生成两个文件：
+        1. features.npy: 包含细胞的基本形态学特征和运动学特征
+        2. features_metadata.npy: 包含特征的元数据信息
+        
+        特征包括：
+        - 形态学特征：体积、表面积、质心坐标
+        - 运动学特征：速度向量、加速度向量
     """
     nifti_files = get_all_nifti_files(data_dir)
     if not nifti_files:

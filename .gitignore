@@ -2,3 +2,5 @@
 *.npy
 *.png
 *.pyc
+*.egg-info
+build/
