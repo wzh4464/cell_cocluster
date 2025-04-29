@@ -26,8 +26,11 @@ def calculate_cell_features(volume, label):
             - centroid_x/y/z: 细胞质心坐标（像素坐标）
             
     Note:
-        所有特征都保存在 features.npy 文件中，元数据保存在 features_metadata.npy 文件中。
-        文件保存在 output_dir/cell_id/ 目录下，文件名格式为 {cell_id}_{timepoint}_features.npy。
+        特征保存在两个文件中：
+        1. features.npy: 包含所有特征值（numpy数组）
+        2. features_metadata.json: 包含特征的元数据信息（JSON格式）
+        
+        文件保存在 output_dir/cell_id/ 目录下，文件名格式为 {cell_id}_{timepoint}_features.*。
     """
     # Get cell mask
     cell_mask = (volume == label)
@@ -121,12 +124,14 @@ def extract_cell_features(data_dir, output_dir, target_cell=None, timepoints=Non
         
     Note:
         对每个细胞每个时间点，会生成两个文件：
-        1. features.npy: 包含细胞的基本形态学特征和运动学特征
-        2. features_metadata.npy: 包含特征的元数据信息
+        1. features.npy: 包含细胞的基本形态学特征和运动学特征（numpy数组）
+        2. features_metadata.json: 包含特征的元数据信息（JSON格式）
         
         特征包括：
         - 形态学特征：体积、表面积、质心坐标
         - 运动学特征：速度向量、加速度向量
+        
+        文件保存在 output_dir/cell_id/ 目录下，文件名格式为 {cell_id}_{timepoint}_features.*。
     """
     nifti_files = get_all_nifti_files(data_dir)
     if not nifti_files:

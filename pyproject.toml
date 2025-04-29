@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Cell co-clustering analysis toolkit"
 readme = "README.md"
 requires-python = ">=3.12"
-authors = [{ name = "Zihan", email = "wzh4464@gmail.com" }]
+authors = [
+    { name = "Zihan", email = "wzh4464@gmail.com" }
+]
 license = { text = "MIT" }
 dependencies = [
     "jupytext>=1.17.0",
@@ -19,6 +21,9 @@ dependencies = [
     "dash>=3.0.3",
     "plotly>=6.0.1",
     "build>=1.2.2.post1",
+    "ipykernel>=6.29.5",
+    "click>=8.0.0",
+    "seaborn>=0.13.2",
 ]
 
 classifiers = [
@@ -27,6 +32,12 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[project.scripts]
+kinematic-features = "tasks.kinematic_features:main"
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src", "tasks"]
