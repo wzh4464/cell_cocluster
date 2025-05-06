@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File with Arguments",
+            "name": "Python Debugger: Coclust Aggregated Features",
             "type": "debugpy",
             "request": "launch",
-            "program": "zelin_feature.py",
+            "program": "coclust_aggregated_features.py",
             "console": "internalConsole",
             // "args": "${command:pickArgs}"
         }

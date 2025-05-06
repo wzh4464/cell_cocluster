@@ -10,7 +10,7 @@ authors = [
 license = { text = "MIT" }
 dependencies = [
     "jupytext>=1.17.0",
-    "numpy>=2.2.4",
+    "numpy==1.26.4",
     "pandas>=2.2.3",
     "scipy>=1.15.2",
     "scikit-learn>=1.6.1",
@@ -24,6 +24,8 @@ dependencies = [
     "ipykernel>=6.29.5",
     "click>=8.0.0",
     "seaborn>=0.13.2",
+    "dask>=2025.4.1",
+    "clustering-geodata-cubes>=0.8.0",
 ]
 
 classifiers = [

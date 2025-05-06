@@ -39,13 +39,41 @@ def load_timeline_data(data_file='cell_timeline_data.txt'):
     df = pd.read_csv(data_file, sep='\t', index_col=0)
     return df
 
-def perform_coclustering(data, n_clusters=9):
-    """Perform co-clustering on the data matrix."""
+def perform_coclustering(data, n_clusters=9, svd_method='randomized', n_svd_vecs=None, mini_batch=False, init='k-means++', n_init=10, random_state=0):
+    """Perform co-clustering on the data matrix.
+    
+    Parameters:
+    -----------
+    data : pandas.DataFrame
+        The input data matrix
+    n_clusters : int, default=9
+        The number of biclusters to find
+    svd_method : {'randomized', 'arpack'}, default='randomized'
+        Method for computing the SVD
+    n_svd_vecs : int, default=None
+        Number of vectors for the SVD. If None, defaults to the largest dimension of the input data
+    mini_batch : bool, default=False
+        Whether to use mini-batch k-means for initialization
+    init : {'k-means++', 'random'}, default='k-means++'
+        Method for initialization
+    n_init : int, default=10
+        Number of random initializations for k-means
+    random_state : int, default=0
+        Random seed for reproducibility
+    """
     # Convert to numpy array
     matrix = data.values
     
     # Create and fit the co-clustering model
-    model = SpectralCoclustering(n_clusters=n_clusters, random_state=0)
+    model = SpectralCoclustering(
+        n_clusters=n_clusters,
+        svd_method=svd_method,
+        n_svd_vecs=n_svd_vecs,
+        mini_batch=mini_batch,
+        init=init,
+        n_init=n_init,
+        random_state=random_state
+    )
     model.fit(matrix)
     
     # Get row and column labels
@@ -226,9 +254,19 @@ def main():
     print("Loading name dictionary...")
     name_dict = load_name_dictionary()
     
+    # Parameters for co-clustering
+    n_clusters = 12  # 可以根据需要修改聚类数量
+    svd_method = 'randomized'  # 可选 'randomized' 或 'arpack'
+    random_state = 0  # 固定随机种子以确保结果可复现
+    
     # Perform co-clustering
     print("Performing co-clustering...")
-    reordered_matrix, cluster_df, time_df = perform_coclustering(data)
+    reordered_matrix, cluster_df, time_df = perform_coclustering(
+        data,
+        n_clusters=n_clusters,
+        svd_method=svd_method,
+        random_state=random_state
+    )
     
     # Plot the results
     print("Plotting results...")
@@ -241,4 +279,4 @@ def main():
     print("\nDetailed cluster information has been saved to cluster_*_details.txt files")
 
 if __name__ == '__main__':
-    main() 
+    main()
