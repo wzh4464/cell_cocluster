@@ -3,7 +3,13 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import SpectralCoclustering
 from sklearn.metrics import consensus_score
 import pandas as pd
-import seaborn as sns
+import os
+from scipy.special import logsumexp
+from scipy.optimize import minimize
+from sklearn.utils import check_random_state
+from scipy.linalg import svd
+from multiprocessing import Pool, cpu_count
+from functools import partial
 
 def load_name_dictionary(dict_file='DATA/name_dictionary.csv'):
     """Load the cell name dictionary."""
@@ -33,14 +39,44 @@ def load_fate_data(fate_file='DATA/fate.csv'):
     fate_df = pd.read_csv(fate_file, header=None, names=['cell', 'fate'])
     return fate_df
 
-def load_timeline_data(data_file='cell_timeline_data.txt'):
+def load_timeline_data(data_file=os.path.join("logs", "cell_timeline_data.txt")):
     """Load the timeline data from the text file."""
     # Read the data
     df = pd.read_csv(data_file, sep='\t', index_col=0)
     return df
 
-def perform_coclustering(data, n_clusters=9, svd_method='randomized', n_svd_vecs=None, mini_batch=False, init='k-means++', n_init=10, random_state=0):
-    """Perform co-clustering on the data matrix.
+def update_row_labels(args):
+    """并行更新行标签的辅助函数"""
+    i, matrix, n_clusters, col_labels, block_probs = args
+    log_probs = np.zeros(n_clusters)
+    for k in range(n_clusters):
+        for j in range(len(col_labels)):
+            l = col_labels[j]
+            p = block_probs[k, l]
+            log_probs[k] += matrix[i, j] * np.log(p) + (1 - matrix[i, j]) * np.log(1 - p)
+    return i, np.argmax(log_probs)
+
+def update_col_labels(args):
+    """并行更新列标签的辅助函数"""
+    j, matrix, n_clusters, row_labels, block_probs = args
+    log_probs = np.zeros(n_clusters)
+    for l in range(n_clusters):
+        for i in range(len(row_labels)):
+            k = row_labels[i]
+            p = block_probs[k, l]
+            log_probs[l] += matrix[i, j] * np.log(p) + (1 - matrix[i, j]) * np.log(1 - p)
+    return j, np.argmax(log_probs)
+
+def update_block_probs(args):
+    """并行更新块概率的辅助函数"""
+    k, l, matrix, row_labels, col_labels = args
+    mask = (row_labels == k)[:, None] & (col_labels == l)
+    if np.sum(mask) > 0:
+        return k, l, np.mean(matrix[mask])
+    return k, l, 0.5
+
+def perform_coclustering(data, n_clusters=9, random_state=0, n_jobs=None):
+    """Perform co-clustering using Bernoulli-Latent Block Model with parallel processing.
     
     Parameters:
     -----------
@@ -48,50 +84,85 @@ def perform_coclustering(data, n_clusters=9, svd_method='randomized', n_svd_vecs
         The input data matrix
     n_clusters : int, default=9
         The number of biclusters to find
-    svd_method : {'randomized', 'arpack'}, default='randomized'
-        Method for computing the SVD
-    n_svd_vecs : int, default=None
-        Number of vectors for the SVD. If None, defaults to the largest dimension of the input data
-    mini_batch : bool, default=False
-        Whether to use mini-batch k-means for initialization
-    init : {'k-means++', 'random'}, default='k-means++'
-        Method for initialization
-    n_init : int, default=10
-        Number of random initializations for k-means
     random_state : int, default=0
         Random seed for reproducibility
+    n_jobs : int, default=None
+        Number of parallel jobs. If None, uses all available cores.
     """
     # Convert to numpy array
     matrix = data.values
     
-    # Create and fit the co-clustering model
-    model = SpectralCoclustering(
-        n_clusters=n_clusters,
-        svd_method=svd_method,
-        n_svd_vecs=n_svd_vecs,
-        mini_batch=mini_batch,
-        init=init,
-        n_init=n_init,
-        random_state=random_state
-    )
-    model.fit(matrix)
+    # Initialize parameters
+    n_rows, n_cols = matrix.shape
+    rng = check_random_state(random_state)
     
-    # Get row and column labels
-    row_labels = model.row_labels_
-    col_labels = model.column_labels_
+    # Initialize row and column cluster assignments
+    row_labels = rng.randint(0, n_clusters, size=n_rows)
+    col_labels = rng.randint(0, n_clusters, size=n_cols)
     
-    # Get the original row and column names
-    row_names = data.index
-    col_names = data.columns.astype(int)  # Convert to integers for proper sorting
+    # Initialize block probabilities
+    block_probs = np.zeros((n_clusters, n_clusters))
+    for i in range(n_clusters):
+        for j in range(n_clusters):
+            mask = (row_labels == i)[:, None] & (col_labels == j)
+            if np.sum(mask) > 0:
+                block_probs[i, j] = np.mean(matrix[mask])
+            else:
+                block_probs[i, j] = 0.5
     
-    # Create a DataFrame with the clustering results
+    # Set number of parallel jobs
+    if n_jobs is None:
+        n_jobs = cpu_count()
+    
+    # EM algorithm
+    max_iter = 100
+    tol = 1e-6
+    prev_log_likelihood = -np.inf
+    
+    with Pool(n_jobs) as pool:
+        for iteration in range(max_iter):
+            # E-step: Update row and column cluster assignments in parallel
+            # Update row labels
+            row_args = [(i, matrix, n_clusters, col_labels, block_probs) for i in range(n_rows)]
+            row_updates = pool.map(update_row_labels, row_args)
+            for i, label in row_updates:
+                row_labels[i] = label
+            
+            # Update column labels
+            col_args = [(j, matrix, n_clusters, row_labels, block_probs) for j in range(n_cols)]
+            col_updates = pool.map(update_col_labels, col_args)
+            for j, label in col_updates:
+                col_labels[j] = label
+            
+            # M-step: Update block probabilities in parallel
+            block_args = [(k, l, matrix, row_labels, col_labels) 
+                         for k in range(n_clusters) for l in range(n_clusters)]
+            block_updates = pool.map(update_block_probs, block_args)
+            for k, l, prob in block_updates:
+                block_probs[k, l] = prob
+            
+            # Calculate log-likelihood
+            log_likelihood = 0
+            for i in range(n_rows):
+                for j in range(n_cols):
+                    k = row_labels[i]
+                    l = col_labels[j]
+                    p = block_probs[k, l]
+                    log_likelihood += matrix[i, j] * np.log(p) + (1 - matrix[i, j]) * np.log(1 - p)
+            
+            # Check convergence
+            if abs(log_likelihood - prev_log_likelihood) < tol:
+                break
+            prev_log_likelihood = log_likelihood
+    
+    # Create DataFrames for the clustering results
     cluster_df = pd.DataFrame({
-        'cell': row_names,
+        'cell': data.index,
         'cluster': row_labels
     })
     
     time_df = pd.DataFrame({
-        'time': col_names,
+        'time': data.columns,
         'cluster': col_labels
     })
     
@@ -243,6 +314,53 @@ def analyze_clusters(matrix, cluster_df, time_df, fate_df, name_dict):
     plt.savefig('fate_distribution.png', dpi=300, bbox_inches='tight')
     print("\nFate distribution plot saved to fate_distribution.png")
 
+def estimate_clusters_by_svd(data, threshold=0.95):
+    """使用SVD秩估计来确定最佳的聚类数目。
+    
+    Parameters:
+    -----------
+    data : pandas.DataFrame
+        输入数据矩阵
+    threshold : float, default=0.95
+        奇异值累积贡献率的阈值
+        
+    Returns:
+    --------
+    int
+        估计的聚类数目
+    """
+    # 转换为numpy数组
+    matrix = data.values
+    
+    # 计算SVD
+    U, s, Vh = svd(matrix)
+    
+    # 计算奇异值的累积贡献率
+    cumsum = np.cumsum(s) / np.sum(s)
+    
+    # 找到第一个超过阈值的索引
+    n_clusters = np.argmax(cumsum >= threshold) + 1
+    
+    # 绘制奇异值分布图
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, len(s) + 1), s, 'b-', label='Singular Values')
+    plt.plot(range(1, len(s) + 1), cumsum, 'r--', label='Cumulative Sum')
+    plt.axvline(x=n_clusters, color='g', linestyle='--', label=f'Estimated Clusters: {n_clusters}')
+    plt.axhline(y=threshold, color='k', linestyle=':', label=f'Threshold: {threshold}')
+    plt.xlabel('Component Number')
+    plt.ylabel('Value')
+    plt.title('SVD Analysis for Cluster Number Estimation')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('svd_analysis.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Estimated number of clusters: {n_clusters}")
+    print(f"Singular values: {s[:n_clusters]}")
+    print(f"Cumulative contribution: {cumsum[n_clusters-1]:.4f}")
+    
+    return n_clusters
+
 def main():
     # Load the data
     print("Loading timeline data...")
@@ -254,18 +372,22 @@ def main():
     print("Loading name dictionary...")
     name_dict = load_name_dictionary()
     
-    # Parameters for co-clustering
-    n_clusters = 12  # 可以根据需要修改聚类数量
-    svd_method = 'randomized'  # 可选 'randomized' 或 'arpack'
+    # Estimate number of clusters using SVD
+    print("Estimating number of clusters using SVD...")
+    n_clusters = 3
     random_state = 0  # 固定随机种子以确保结果可复现
+    
+    # Get number of available CPU cores
+    n_jobs = cpu_count()
+    print(f"Using {n_jobs} CPU cores for parallel processing")
     
     # Perform co-clustering
     print("Performing co-clustering...")
     reordered_matrix, cluster_df, time_df = perform_coclustering(
         data,
         n_clusters=n_clusters,
-        svd_method=svd_method,
-        random_state=random_state
+        random_state=random_state,
+        n_jobs=n_jobs
     )
     
     # Plot the results

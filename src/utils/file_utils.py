@@ -47,17 +47,17 @@ def get_embryo_name_from_filename(file_path):
     embryo_name, _ = parse_nifti_filename(file_path)
     return embryo_name
 
-def get_cell_id_from_label(label: int) -> str:
+def get_cell_id_from_label(label: Union[int, float]) -> str:
     """
     从标签值生成细胞ID
     
     Args:
-        label: 细胞标签值
+        label: 细胞标签值（整数或浮点数）
         
     Returns:
         str: 细胞ID
     """
-    return f"cell_{label:03d}"
+    return f"cell_{int(label):03d}"
 
 def ensure_directory(directory: Union[str, Path]) -> Path:
     """
