@@ -14,7 +14,17 @@ def parse_nifti_filename(file_path: Union[str, Path]) -> Tuple[str, str]:
         tuple: (embryo_name, timepoint)
     """
     file_path = Path(file_path)
-    parts = file_path.stem.split('_')
+    filename = file_path.name
+    
+    # Remove .nii.gz or .nii extension
+    if filename.lower().endswith('.nii.gz'):
+        basename = filename[:-7]  # Remove .nii.gz
+    elif filename.lower().endswith('.nii'):
+        basename = filename[:-4]  # Remove .nii
+    else:
+        basename = file_path.stem
+    
+    parts = basename.split('_')
 
     if len(parts) < 3:
         raise ValueError(f"Invalid NIfTI filename format: {file_path}")
@@ -107,4 +117,6 @@ def is_nifti_file(file_path: Union[str, Path]) -> bool:
     Returns:
         bool: 是否为NIfTI文件
     """
-    return get_file_extension(file_path) in ['.nii', '.nii.gz']
+    file_path = Path(file_path)
+    filename = file_path.name.lower()
+    return filename.endswith('.nii') or filename.endswith('.nii.gz')
