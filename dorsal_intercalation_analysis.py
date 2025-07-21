@@ -8,6 +8,7 @@ This script processes dorsal intercalation cells to generate:
 4. Velocity field analysis
 """
 
+from typing import Union
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ import json
 import nibabel as nib
 from scipy import ndimage
 import warnings
+from nibabel.nifti1 import load
 
 warnings.filterwarnings("ignore")
 
@@ -34,8 +36,7 @@ class DorsalIntercalationAnalyzer:
         cells = []
         with open(dorsal_file, "r") as f:
             for line in f:
-                line = line.strip()
-                if line:
+                if line := line.strip():
                     cells.append(line)
         return cells
 
@@ -66,9 +67,7 @@ class DorsalIntercalationAnalyzer:
             self.data_dir
             / f"SegmentCellUnified/WT_Sample1LabelUnified/WT_Sample1LabelUnified_{time_point:03d}_segCell.nii.gz"
         )
-        if seg_file.exists():
-            return nib.load(seg_file).get_fdata()
-        return None
+        return load(seg_file).get_fdata() if seg_file.exists() else None
 
     def extract_cell_centroids(self, time_range=(220, 251)):
         """Extract cell centroids for time range."""
@@ -94,9 +93,11 @@ class DorsalIntercalationAnalyzer:
 
         for cell_id in self.dorsal_cell_ids:
             trajectory = []
-            for t in sorted(centroids.keys()):
-                if cell_id in centroids[t]:
-                    trajectory.append([t] + list(centroids[t][cell_id]))
+            trajectory.extend(
+                [t] + list(centroids[t][cell_id])
+                for t in sorted(centroids.keys())
+                if cell_id in centroids[t]
+            )
             if trajectory:
                 trajectories[cell_id] = np.array(trajectory)
 
@@ -143,8 +144,7 @@ class DorsalIntercalationAnalyzer:
                         # Calculate irregularity as ratio of surface area to volume for 3D
                         from skimage import measure
 
-                        props = measure.regionprops(mask.astype(int))
-                        if props:
+                        if props := measure.regionprops(mask.astype(int)):
                             # For 3D data, use surface area / volume ratio
                             area = props[0].area  # This is volume for 3D
                             # Use sqrt(area) as a proxy for surface area since perimeter is not available
@@ -187,7 +187,9 @@ class DorsalIntercalationAnalyzer:
 
         return velocities
 
-    def plot_coclustering_heatmap(self, save_path="coclustering_heatmap.png"):
+    def plot_coclustering_heatmap(
+        self, save_path: Union[str, Path] = "coclustering_heatmap.png"
+    ):
         """Generate co-clustering probability heatmap."""
         if len(self.dorsal_cell_ids) == 0:
             print("No dorsal cells found, skipping heatmap")
@@ -200,7 +202,7 @@ class DorsalIntercalationAnalyzer:
         # Create heatmap
         sns.heatmap(
             prob_matrix,
-            xticklabels=time_range[::5],  # Show every 5th time point
+            xticklabels=[str(t) for t in time_range[::5]],  # Show every 5th time point
             yticklabels=[f"DC{i+1:02d}" for i in range(len(self.dorsal_cell_ids))],
             cmap="viridis",
             cbar_kws={"label": "Co-clustering Probability"},
@@ -211,13 +213,11 @@ class DorsalIntercalationAnalyzer:
         )
         plt.xlabel("Time (minutes post-fertilization)")
         plt.ylabel("Dorsal Cell ID")
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
-        plt.close()
+        return self._save_velocity_field_plot(save_path)
 
-        return save_path
-
-    def plot_cell_trajectories(self, save_path="cell_trajectories.png"):
+    def plot_cell_trajectories(
+        self, save_path: Union[str, Path] = "cell_trajectories.png"
+    ):
         """Generate cell trajectory visualization."""
         if len(self.dorsal_cell_ids) == 0:
             print("No dorsal cells found, skipping trajectories")
@@ -231,7 +231,7 @@ class DorsalIntercalationAnalyzer:
 
         plt.figure(figsize=(10, 8))
 
-        colors = plt.cm.tab20(np.linspace(0, 1, len(trajectories)))
+        colors = plt.cm.get_cmap("tab20")(np.linspace(0, 1, len(trajectories)))
 
         for i, (cell_id, trajectory) in enumerate(trajectories.items()):
             if len(trajectory) > 1:
@@ -266,18 +266,16 @@ class DorsalIntercalationAnalyzer:
                 )
 
         plt.axvline(x=0, color="black", linestyle="--", alpha=0.5, label="Midline")
-        plt.xlabel("Anterior-Posterior Axis (μm)")
-        plt.ylabel("Left-Right Axis (μm)")
-        plt.title("Cell Trajectory Visualization\nDorsal Intercalation (220-250 min)")
+        self._set_plot_labels(
+            "Anterior-Posterior Axis (μm)",
+            "Left-Right Axis (μm)",
+            "Cell Trajectory Visualization\nDorsal Intercalation (220-250 min)",
+        )
         plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
-        plt.close()
-
-        return save_path
+        return self._save_velocity_field_plot(save_path)
 
     def plot_morphological_irregularity(
-        self, save_path="morphological_irregularity.png"
+        self, save_path: Union[str, Path] = "morphological_irregularity.png"
     ):
         """Generate morphological irregularity dynamics plot."""
         irregularity_data = self.calculate_morphological_irregularity()
@@ -336,18 +334,16 @@ class DorsalIntercalationAnalyzer:
             230, 240, alpha=0.2, color="yellow", label="Co-clustering Active Window"
         )
 
-        plt.xlabel("Time (minutes post-fertilization)")
-        plt.ylabel("Morphological Irregularity Index")
-        plt.title("Morphological Irregularity Dynamics\nDorsal Intercalation Cells")
+        self._set_plot_labels(
+            "Time (minutes post-fertilization)",
+            "Morphological Irregularity Index",
+            "Morphological Irregularity Dynamics\nDorsal Intercalation Cells",
+        )
         plt.legend()
         plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
-        plt.close()
+        return self._save_velocity_field_plot(save_path)
 
-        return save_path
-
-    def plot_velocity_field(self, save_path="velocity_field.png"):
+    def plot_velocity_field(self, save_path: Union[str, Path] = "velocity_field.png"):
         """Generate velocity field analysis plot."""
         velocities = self.calculate_midline_velocity()
 
@@ -366,7 +362,7 @@ class DorsalIntercalationAnalyzer:
 
         # Calculate statistics for each time bin
         velocity_stats = []
-        for i, t in enumerate(time_bins):
+        for t in time_bins:
             time_mask = (np.array(all_times) >= t) & (np.array(all_times) < t + 2)
             if np.any(time_mask):
                 bin_velocities = np.array(all_velocities)[time_mask]
@@ -383,14 +379,23 @@ class DorsalIntercalationAnalyzer:
             widths=1.5,
         )
 
-        plt.xlabel("Time (minutes post-fertilization)")
-        plt.ylabel("Midline Crossing Velocity (μm/min)")
-        plt.title("Velocity Field Analysis\nDorsal Intercalation Cells")
+        self._set_plot_labels(
+            "Time (minutes post-fertilization)",
+            "Midline Crossing Velocity (μm/min)",
+            "Velocity Field Analysis\nDorsal Intercalation Cells",
+        )
         plt.grid(True, alpha=0.3)
+        return self._save_velocity_field_plot(save_path)
+
+    def _set_plot_labels(self, x_axis_label, y_axis_label, plot_title):
+        plt.xlabel(x_axis_label)
+        plt.ylabel(y_axis_label)
+        plt.title(plot_title)
+
+    def _save_velocity_field_plot(self, save_path):
         plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
         plt.close()
-
         return save_path
 
     def generate_all_plots(self, output_dir="dorsal_plots"):
@@ -405,29 +410,25 @@ class DorsalIntercalationAnalyzer:
             return plots
 
         print("Generating co-clustering heatmap...")
-        result = self.plot_coclustering_heatmap(
+        if result := self.plot_coclustering_heatmap(
             output_dir / "PanelA_coclustering_heatmap.png"
-        )
-        if result:
+        ):
             plots["heatmap"] = result
 
         print("Generating cell trajectories...")
-        result = self.plot_cell_trajectories(
+        if result := self.plot_cell_trajectories(
             output_dir / "PanelB_cell_trajectories.png"
-        )
-        if result:
+        ):
             plots["trajectories"] = result
 
         print("Generating morphological irregularity plot...")
-        result = self.plot_morphological_irregularity(
+        if result := self.plot_morphological_irregularity(
             output_dir / "PanelC_morphological_irregularity.png"
-        )
-        if result:
+        ):
             plots["irregularity"] = result
 
         print("Generating velocity field plot...")
-        result = self.plot_velocity_field(output_dir / "PanelD_velocity_field.png")
-        if result:
+        if result := self.plot_velocity_field(output_dir / "PanelD_velocity_field.png"):
             plots["velocity"] = result
 
         return plots
