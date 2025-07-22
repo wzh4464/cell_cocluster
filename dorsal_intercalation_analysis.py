@@ -399,7 +399,7 @@ class DorsalIntercalationAnalyzer:
         return save_path
 
     def generate_all_plots(self, output_dir="dorsal_plots"):
-        """Generate all required plots."""
+        """Generate all required plots using a function table (dictionary of function pointers)."""
         output_dir = Path(output_dir)
         output_dir.mkdir(exist_ok=True)
 
@@ -409,27 +409,19 @@ class DorsalIntercalationAnalyzer:
             print("No dorsal cells found, cannot generate plots")
             return plots
 
-        print("Generating co-clustering heatmap...")
-        if result := self.plot_coclustering_heatmap(
-            output_dir / "PanelA_coclustering_heatmap.png"
-        ):
-            plots["heatmap"] = result
+        # 定义函数表，key为plot类型，value为(方法, 保存路径)
+        plot_table = {
+            "heatmap": (self.plot_coclustering_heatmap, output_dir / "PanelA_coclustering_heatmap.png"),
+            "trajectories": (self.plot_cell_trajectories, output_dir / "PanelB_cell_trajectories.png"),
+            "irregularity": (self.plot_morphological_irregularity, output_dir / "PanelC_morphological_irregularity.png"),
+            "velocity": (self.plot_velocity_field, output_dir / "PanelD_velocity_field.png"),
+        }
 
-        print("Generating cell trajectories...")
-        if result := self.plot_cell_trajectories(
-            output_dir / "PanelB_cell_trajectories.png"
-        ):
-            plots["trajectories"] = result
-
-        print("Generating morphological irregularity plot...")
-        if result := self.plot_morphological_irregularity(
-            output_dir / "PanelC_morphological_irregularity.png"
-        ):
-            plots["irregularity"] = result
-
-        print("Generating velocity field plot...")
-        if result := self.plot_velocity_field(output_dir / "PanelD_velocity_field.png"):
-            plots["velocity"] = result
+        for plot_name, (plot_func, save_path) in plot_table.items():
+            print(f"Generating {plot_name} plot...")
+            result = plot_func(save_path)
+            if result:
+                plots[plot_name] = result
 
         return plots
 
