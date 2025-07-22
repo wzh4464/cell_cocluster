@@ -119,12 +119,31 @@ class DorsalIntercalationAnalyzer:
         # Create probability matrix: cells x time
         prob_matrix = np.zeros((len(self.dorsal_cell_ids), len(time_range)))
 
-        # This is a simplified version - you may need to adapt based on your clustering data structure
+        # Calculate co-clustering probabilities based on actual clustering results
         for i, cell_id in enumerate(self.dorsal_cell_ids):
             for j, t in enumerate(time_range):
-                # Calculate probability based on clustering results
-                # This needs to be adapted to your specific clustering format
-                prob_matrix[i, j] = np.random.random()  # Placeholder
+                # Calculate probability that this cell is co-clustered at time t
+                prob = 0.0
+                count = 0
+
+                # Look through all clustering results for this cell and time
+                for key, result in clustering_results.items():
+                    if f"cell_{cell_id}" in key:
+                        # Check if this time point is within the clustering result
+                        time_labels = result.get("time_labels", [])
+                        if len(time_labels) > (t - 220):  # Adjust for time offset
+                            time_idx = t - 220
+                            if time_idx >= 0 and time_idx < len(time_labels):
+                                # If time_label is 1, it means this cell is part of a cluster at this time
+                                prob += time_labels[time_idx]
+                                count += 1
+
+                # Average probability across all relevant clustering results
+                if count > 0:
+                    prob_matrix[i, j] = prob / count
+                else:
+                    # If no clustering data available, use low probability
+                    prob_matrix[i, j] = 0.1
 
         return prob_matrix, time_range
 
@@ -187,33 +206,121 @@ class DorsalIntercalationAnalyzer:
 
         return velocities
 
+    def create_demo_coclustering_data(self):
+        """Create demo co-clustering data with ideal patterns."""
+        # Time range: 220-255 minutes (discrete integer minutes)
+        time_range = np.arange(220, 256)
+        n_cells_per_side = 6  # 6 cells per side
+
+        # Create probability matrices for left and right sides separately
+        left_matrix = np.zeros((n_cells_per_side, len(time_range)))
+        right_matrix = np.zeros((n_cells_per_side, len(time_range)))
+
+        # Clustering time periods
+        cluster_rise_start = 225
+        cluster_rise_end = 230
+        cluster_high_start = 230
+        cluster_high_end = 254
+        cluster_fall_start = 255
+
+        for i in range(n_cells_per_side):
+            for j, t in enumerate(time_range):
+                if cluster_rise_start <= t <= cluster_rise_end:
+                    # 225-230分钟快速上升
+                    progress = (t - cluster_rise_start) / (
+                        cluster_rise_end - cluster_rise_start
+                    )
+                    base_prob = 0.2 + 0.75 * progress  # 0.2到0.95
+                elif cluster_high_start < t < cluster_fall_start:
+                    # 230-254分钟保持高概率
+                    base_prob = 0.95 + np.random.normal(0, 0.02)
+                elif t == cluster_fall_start:
+                    # 255分钟概率略有下降
+                    base_prob = 0.8 + np.random.normal(0, 0.05)
+                else:
+                    # 其他时间低概率
+                    base_prob = 0.1 + np.random.normal(0, 0.02)
+
+                # 加入细胞间微小噪声
+                noise = np.random.normal(0, 0.03)
+                left_matrix[i, j] = base_prob + noise
+                right_matrix[i, j] = base_prob + noise
+
+        # Ensure probabilities are in [0, 1] range
+        left_matrix = np.clip(left_matrix, 0, 1)
+        right_matrix = np.clip(right_matrix, 0, 1)
+
+        return left_matrix, right_matrix, time_range
+
     def plot_coclustering_heatmap(
-        self, save_path: Union[str, Path] = "coclustering_heatmap.png"
+        self,
+        save_path: Union[str, Path] = "coclustering_heatmap.png",
+        use_demo_data: bool = False,
     ):
         """Generate co-clustering probability heatmap."""
-        if len(self.dorsal_cell_ids) == 0:
-            print("No dorsal cells found, skipping heatmap")
-            return None
+        if use_demo_data:
+            # Use demo data for ideal visualization
+            left_matrix, right_matrix, time_range = self.create_demo_coclustering_data()
 
-        prob_matrix, time_range = self.calculate_coclustering_probabilities()
+            # Create separate left/right heatmaps
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
 
-        plt.figure(figsize=(12, 8))
+            # Left side heatmap
+            sns.heatmap(
+                left_matrix,
+                xticklabels=[str(t) if t % 5 == 0 else "" for t in time_range],
+                yticklabels=[f"L{i+1:02d}" for i in range(left_matrix.shape[0])],
+                cmap="RdBu_r",
+                vmin=0,
+                vmax=1,
+                cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
+                ax=ax1,
+            )
+            ax1.set_xlabel("Time (minutes)")
+            ax1.set_ylabel("Left Dorsal Cells")
 
-        # Create heatmap
-        sns.heatmap(
-            prob_matrix,
-            xticklabels=[str(t) for t in time_range[::5]],  # Show every 5th time point
-            yticklabels=[f"DC{i+1:02d}" for i in range(len(self.dorsal_cell_ids))],
-            cmap="viridis",
-            cbar_kws={"label": "Co-clustering Probability"},
-        )
+            # Right side heatmap
+            sns.heatmap(
+                right_matrix,
+                xticklabels=[str(t) if t % 5 == 0 else "" for t in time_range],
+                yticklabels=[f"R{i+1:02d}" for i in range(right_matrix.shape[0])],
+                cmap="RdBu_r",
+                vmin=0,
+                vmax=1,
+                cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
+                ax=ax2,
+            )
+            ax2.set_xlabel("Time (minutes)")
+            ax2.set_ylabel("Right Dorsal Cells")
 
-        plt.title(
-            "Co-clustering Probability Heatmap\nDorsal Intercalation Cells (220-250 min)"
-        )
-        plt.xlabel("Time (minutes post-fertilization)")
-        plt.ylabel("Dorsal Cell ID")
-        return self._save_velocity_field_plot(save_path)
+            plt.tight_layout()
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+            plt.close()
+            return save_path
+        else:
+            # Original implementation for real data
+            if len(self.dorsal_cell_ids) == 0:
+                print("No dorsal cells found, skipping heatmap")
+                return None
+
+            prob_matrix, time_range = self.calculate_coclustering_probabilities()
+
+            plt.figure(figsize=(12, 8))
+
+            # Create heatmap
+            sns.heatmap(
+                prob_matrix,
+                xticklabels=[
+                    str(t) for t in time_range[::5]
+                ],  # Show every 5th time point
+                yticklabels=[f"DC{i+1:02d}" for i in range(len(self.dorsal_cell_ids))],
+                cmap="viridis",
+                cbar_kws={"label": "Co-clustering Probability"},
+            )
+
+            plt.xlabel("Time (minutes post-fertilization)")
+            plt.ylabel("Dorsal Cell ID")
+            return self._save_velocity_field_plot(save_path)
 
     def plot_cell_trajectories(
         self, save_path: Union[str, Path] = "cell_trajectories.png"
@@ -409,17 +516,26 @@ class DorsalIntercalationAnalyzer:
             print("No dorsal cells found, cannot generate plots")
             return plots
 
-        # 定义函数表，key为plot类型，value为(方法, 保存路径)
+        # 定义函数表，key为plot类型，value为(方法, 保存路径, 参数)
         plot_table = {
-            "heatmap": (self.plot_coclustering_heatmap, output_dir / "PanelA_coclustering_heatmap.png"),
-            "trajectories": (self.plot_cell_trajectories, output_dir / "PanelB_cell_trajectories.png"),
-            "irregularity": (self.plot_morphological_irregularity, output_dir / "PanelC_morphological_irregularity.png"),
-            "velocity": (self.plot_velocity_field, output_dir / "PanelD_velocity_field.png"),
+            "heatmap": (
+                self.plot_coclustering_heatmap,
+                output_dir / "PanelA_coclustering_heatmap.png",
+                {},
+            ),
+            "demo_heatmap": (
+                self.plot_coclustering_heatmap,
+                output_dir / "demo_ideal_coclustering.png",
+                {"use_demo_data": True},
+            ),
+            # "trajectories": (self.plot_cell_trajectories, output_dir / "PanelB_cell_trajectories.png", {}),
+            # "irregularity": (self.plot_morphological_irregularity, output_dir / "PanelC_morphological_irregularity.png", {}),
+            # "velocity": (self.plot_velocity_field, output_dir / "PanelD_velocity_field.png", {}),
         }
 
-        for plot_name, (plot_func, save_path) in plot_table.items():
+        for plot_name, (plot_func, save_path, kwargs) in plot_table.items():
             print(f"Generating {plot_name} plot...")
-            result = plot_func(save_path)
+            result = plot_func(save_path, **kwargs)
             if result:
                 plots[plot_name] = result
 
