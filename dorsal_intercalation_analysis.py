@@ -252,6 +252,88 @@ class DorsalIntercalationAnalyzer:
 
         return left_matrix, right_matrix, time_range
 
+    def analyze_coclustering_features(self):
+        """Analyze features in dorsal co-clustering for pie chart."""
+        prob_matrix, time_range = self.calculate_coclustering_probabilities()
+
+        if prob_matrix.size == 0:
+            # Use demo data if no real data available
+            left_matrix, right_matrix, _ = self.create_demo_coclustering_data()
+            prob_matrix = np.vstack([left_matrix, right_matrix])
+
+        # Define feature categories based on clustering behavior
+        features = {
+            "High Activity Cells": 0,  # 高活跃聚类细胞 (mean prob > 0.7)
+            "Medium Activity Cells": 0,  # 中等活跃聚类细胞 (0.4 < mean prob <= 0.7)
+            "Low Activity Cells": 0,  # 低活跃聚类细胞 (0.2 < mean prob <= 0.4)
+            "Inactive Cells": 0,  # 非活跃细胞 (mean prob <= 0.2)
+        }
+
+        # Analyze each cell's clustering behavior
+        for i in range(prob_matrix.shape[0]):
+            cell_mean_prob = np.mean(prob_matrix[i, :])
+
+            if cell_mean_prob > 0.7:
+                features["High Activity Cells"] += 1
+            elif cell_mean_prob > 0.4:
+                features["Medium Activity Cells"] += 1
+            elif cell_mean_prob > 0.2:
+                features["Low Activity Cells"] += 1
+            else:
+                features["Inactive Cells"] += 1
+
+        return features
+
+    def plot_feature_pie_chart(
+        self, save_path: Union[str, Path] = "feature_pie_chart.png"
+    ):
+        """Generate pie chart showing feature distribution in dorsal co-clustering."""
+        features = self.analyze_coclustering_features()
+
+        # Remove categories with zero counts
+        features = {k: v for k, v in features.items() if v > 0}
+
+        # Create pie chart
+        plt.figure(figsize=(10, 8))
+
+        labels = list(features.keys())
+        sizes = list(features.values())
+        colors = ["#ff9999", "#66b3ff", "#99ff99", "#ffcc99"][: len(labels)]
+
+        # Create pie chart with enhanced styling
+        wedges, texts, autotexts = plt.pie(
+            sizes,
+            labels=labels,
+            colors=colors,
+            autopct="%1.1f%%",
+            startangle=90,
+            explode=[0.05] * len(labels),  # Slightly separate all slices
+            shadow=True,
+            textprops={"fontsize": 12},
+        )
+
+        # Enhance text styling
+        for autotext in autotexts:
+            autotext.set_color("white")
+            autotext.set_fontweight("bold")
+
+        plt.axis("equal")  # Equal aspect ratio ensures circular pie
+
+        # Add legend with cell counts
+        legend_labels = [f"{label}: {count} cells" for label, count in features.items()]
+        plt.legend(
+            wedges,
+            legend_labels,
+            title="Cell Categories",
+            loc="center left",
+            bbox_to_anchor=(1, 0, 0.5, 1),
+        )
+
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+
     def plot_coclustering_heatmap(
         self,
         save_path: Union[str, Path] = "coclustering_heatmap.png",
@@ -523,14 +605,19 @@ class DorsalIntercalationAnalyzer:
                 output_dir / "PanelA_coclustering_heatmap.png",
                 {},
             ),
+            "feature_pie": (
+                self.plot_feature_pie_chart,
+                output_dir / "PanelB_feature_distribution.png",
+                {},
+            ),
             "demo_heatmap": (
                 self.plot_coclustering_heatmap,
                 output_dir / "demo_ideal_coclustering.png",
                 {"use_demo_data": True},
             ),
-            # "trajectories": (self.plot_cell_trajectories, output_dir / "PanelB_cell_trajectories.png", {}),
-            # "irregularity": (self.plot_morphological_irregularity, output_dir / "PanelC_morphological_irregularity.png", {}),
-            # "velocity": (self.plot_velocity_field, output_dir / "PanelD_velocity_field.png", {}),
+            # "trajectories": (self.plot_cell_trajectories, output_dir / "PanelC_cell_trajectories.png", {}),
+            # "irregularity": (self.plot_morphological_irregularity, output_dir / "PanelD_morphological_irregularity.png", {}),
+            # "velocity": (self.plot_velocity_field, output_dir / "PanelE_velocity_field.png", {}),
         }
 
         for plot_name, (plot_func, save_path, kwargs) in plot_table.items():

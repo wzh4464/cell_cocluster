@@ -45,3 +45,10 @@
 - `create_demo_coclustering_data()`: 生成理想的聚类概率数据
 - `plot_coclustering_heatmap(use_demo_data=True)`: 可选择使用demo数据
 - 在`generate_all_plots()`中自动生成demo图表
+
+### 特征分析饼图
+新增饼图功能分析dorsal co-cluster中的特征分布:
+- `analyze_coclustering_features()`: 分析细胞聚类活跃度特征
+- `plot_feature_pie_chart()`: 生成特征分布饼图
+- 特征分类: 高活跃(>0.7)、中等活跃(0.4-0.7)、低活跃(0.2-0.4)、非活跃(<0.2)
+- 输出: `PanelB_feature_distribution.png`
