@@ -1,0 +1,412 @@
+Cluster 2 Details
+==================================================
+
+Cells in this cluster:
+--------------------
+ABalaaaala (Unspecified)
+ABalaaaalp (Unspecified)
+ABalaaaarl (Unspecified)
+ABalaaaarr (Unspecified)
+ABalaaapal (Neuron)
+ABalaaapar (Unspecified)
+ABalaaappl (Unspecified)
+ABalaaappr (Neuron)
+ABalaapaaa (Unspecified)
+ABalaapaap (Unspecified)
+ABalaapapa (Death)
+ABalaapapp (Unspecified)
+ABalaappaa (Death)
+ABalaappap (Neuron)
+ABalaapppa (Unspecified)
+ABalaapppp (Unspecified)
+ABalapaaaa (Unspecified)
+ABalapaaap (Neuron)
+ABalapaapa (Unspecified)
+ABalapaapp (Unspecified)
+ABalapapaa (Death)
+ABalapapap (Unspecified)
+ABalapappa (Unspecified)
+ABalapappp (Neuron)
+ABalappaaa (Death)
+ABalappaap (Unspecified)
+ABalappapa (Unspecified)
+ABalappapp (Neuron)
+ABalapppaa (Neuron)
+ABalapppap (Unspecified)
+ABalappppa (Unspecified)
+ABalappppp (Neuron)
+ABalpaaaaa (Pharynx)
+ABalpaaaap (Unspecified)
+ABalpaaapa (Unspecified)
+ABalpaaapp (Unspecified)
+ABalpaapaa (Unspecified)
+ABalpaapap (Pharynx)
+ABalpaappa (Skin)
+ABalpaappp (Skin)
+ABalpapaaa (Unspecified)
+ABalpapaap (Unspecified)
+ABalpapapa (Unspecified)
+ABalpapapp (Unspecified)
+ABalpappaa (Unspecified)
+ABalpappap (Pharynx)
+ABalpapppa (Unspecified)
+ABalpapppp (Pharynx)
+ABalppaaaa (Death)
+ABalppaaap (Neuron)
+ABalppaapa (Death)
+ABalppaapp (Unspecified)
+ABalppapaa (Neuron)
+ABalppapap (Neuron)
+ABalppappa (Neuron)
+ABalppappp (Unspecified)
+ABalpppaaa (Neuron)
+ABalpppaap (Unspecified)
+ABalpppapa (Neuron)
+ABalpppapp (Unspecified)
+ABalpppappa (Death)
+ABalppppaa (Unspecified)
+ABalppppap (Unspecified)
+ABalpppppa (Neuron)
+ABalpppppp (Unspecified)
+ABalppppppa (Unspecified)
+ABalppppppp (Neuron)
+ABaraaaaaa (Pharynx)
+ABaraaaaap (Pharynx)
+ABaraaaapa (Unspecified)
+ABaraaaapp (Death)
+ABaraaapaa (Unspecified)
+ABaraaapap (Pharynx)
+ABaraaappa (Skin)
+ABaraaappp (Skin)
+ABaraapaaa (Pharynx)
+ABaraapaap (Pharynx)
+ABaraapapa (Unspecified)
+ABaraapapp (Pharynx)
+ABaraappaa (Pharynx)
+ABaraappap (Pharynx)
+ABaraapppa (Unspecified)
+ABaraapppp (Pharynx)
+ABarapaaaa (Pharynx)
+ABarapaaap (Unspecified)
+ABarapaapa (Unspecified)
+ABarapaapp (Pharynx)
+ABarapapaa (Unspecified)
+ABarapapap (Unspecified)
+ABarapappa (Unspecified)
+ABarapappp (Pharynx)
+ABarappaaa (Unspecified)
+ABarappaap (Unspecified)
+ABarappapa (Unspecified)
+ABarappapp (Neuron)
+ABarapppaa (Neuron)
+ABarapppap (Neuron)
+ABarappppa (Neuron)
+ABarappppp (Unspecified)
+ABarpaaaaa (Neuron)
+ABarpaaaap (Neuron)
+ABarpaaapa (Neuron)
+ABarpaaapp (Death)
+ABarpapaaa (Unspecified)
+ABarpapaap (Unspecified)
+ABplaaaaaa (Unspecified)
+ABplaaaaap (Unspecified)
+ABplaapaaa (Unspecified)
+ABplaapaap (Neuron)
+ABplaapapa (Neuron)
+ABplaapapp (Unspecified)
+ABplapaaaa (Unspecified)
+ABplapaaap (Neuron)
+ABplapappp (Unspecified)
+ABplapppaa (Unspecified)
+ABplapppap (Unspecified)
+ABplpaaaaa (Neuron)
+ABplpaaaap (Unspecified)
+ABplpaaapa (Neuron)
+ABplpaaapp (Unspecified)
+ABplpaapaa (Neuron)
+ABplpaapap (Unspecified)
+ABplpaappa (Neuron)
+ABplpaappp (Unspecified)
+ABplpapaaa (Neuron)
+ABplpapaap (Neuron)
+ABplpapapa (Unspecified)
+ABplpapapp (Neuron)
+ABplpappaa (Unspecified)
+ABplpappap (Death)
+ABplpapppa (Other)
+ABplpapppp (Unspecified)
+ABplppaaaa (Unspecified)
+ABplppaaap (Death)
+ABplppaapa (Unspecified)
+ABplppaapp (Neuron)
+ABplppapaa (Neuron)
+ABplppapap (Neuron)
+ABplppappa (Neuron)
+ABplppappp (Neuron)
+ABplpppaaa (Neuron)
+ABplpppaap (Neuron)
+ABplpppapa (Unspecified)
+ABplpppapp (Death)
+ABplppppaa (Unspecified)
+ABplppppap (Other)
+ABplpppppa (Other)
+ABplpppppp (Unspecified)
+ABpraaaaaa (Neuron)
+ABpraaaaap (Unspecified)
+ABpraaaapa (Neuron)
+ABpraaaapp (Unspecified)
+ABpraaapaa (Unspecified)
+ABpraaapap (Unspecified)
+ABpraaappa (Neuron)
+ABpraaappp (Unspecified)
+ABpraaapppp (Neuron)
+ABpraapaaa (Unspecified)
+ABpraapaap (Neuron)
+ABpraapapa (Neuron)
+ABpraapapp (Unspecified)
+ABprapaaaa (Unspecified)
+ABprapaaap (Neuron)
+ABprapappp (Unspecified)
+ABprapppaa (Unspecified)
+ABprapppap (Unspecified)
+ABprpaaaaa (Neuron)
+ABprpaaaap (Unspecified)
+ABprpaaapa (Neuron)
+ABprpaaapp (Unspecified)
+ABprpaapaa (Neuron)
+ABprpaapap (Unspecified)
+ABprpaappa (Neuron)
+ABprpaappp (Unspecified)
+ABprpapaaa (Neuron)
+ABprpapaap (Neuron)
+ABprpapapa (Unspecified)
+ABprpapapp (Neuron)
+ABprpappaa (Neuron)
+ABprpappap (Neuron)
+ABprpapppa (Neuron)
+ABprpapppp (Other)
+ABprppaaaa (Unspecified)
+ABprppaaap (Death)
+ABprppaapa (Unspecified)
+ABprppaapp (Neuron)
+ABprppapaa (Neuron)
+ABprppapap (Neuron)
+ABprppappa (Neuron)
+ABprppappp (Neuron)
+ABprpppaaa (Unspecified)
+ABprpppaap (Neuron)
+ABprpppapa (Unspecified)
+ABprpppapp (Death)
+ABprppppaa (Unspecified)
+ABprppppap (Unspecified)
+ABprpppppa (Unspecified)
+ABprpppppp (Unspecified)
+Caapa (Unspecified)
+Capaaa (Muscle)
+Capaap (Muscle)
+Capapa (Muscle)
+Capapp (Muscle)
+Cappaa (Muscle)
+Cappap (Muscle)
+Capppa (Muscle)
+Capppp (Muscle)
+Cppaaa (Muscle)
+Cppaap (Muscle)
+Cppapa (Muscle)
+Cppapp (Muscle)
+Cpppaa (Muscle)
+Cpppap (Muscle)
+Cppppa (Muscle)
+Cppppp (Muscle)
+Daaa (Muscle)
+Daap (Muscle)
+Dapa (Muscle)
+Dapp (Muscle)
+Dpaa (Muscle)
+Dpap (Muscle)
+Dppa (Muscle)
+Dppp (Muscle)
+MSaaaaaa (Other)
+MSaaaaap (Pharynx)
+MSaaaapa (Pharynx)
+MSaaaapp (Unspecified)
+MSaaapaa (Pharynx)
+MSaaapap (Pharynx)
+MSaaappa (Death)
+MSaapaaa (Pharynx)
+MSaapaap (Unspecified)
+MSaapapa (Unspecified)
+MSaapapp (Unspecified)
+MSaappa (Other)
+MSaappp (Muscle)
+MSapaapa (Death)
+MSappaa (Other)
+MSappap (Unspecified)
+MSappapa (Death)
+MSapppa (Muscle)
+MSapppp (Muscle)
+MSpaaaaa (Unspecified)
+MSpaaaap (Pharynx)
+MSpaaapa (Pharynx)
+MSpaaapp (Pharynx)
+MSpaapaa (Unspecified)
+MSpaapap (Unspecified)
+MSpaapp (Death)
+MSpapaaa (Pharynx)
+MSpapaap (Unspecified)
+MSpapapa (Unspecified)
+MSpapapp (Unspecified)
+MSpappa (Muscle)
+MSpappp (Muscle)
+MSpapppa (Muscle)
+MSppaap (Unspecified)
+MSppaapa (Death)
+MSpppaa (Unspecified)
+MSpppap (Unspecified)
+MSpppapa (Death)
+MSppppa (Muscle)
+MSppppp (Muscle)
+
+Time points in this cluster:
+--------------------
+1
+10
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+11
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+12
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+13
+14
+15
+16
+17
+18
+19
+2
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+3
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+4
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+5
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+6
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+7
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+8
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+9
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+
+Cluster density: 0.02
+
+Fate distribution:
+--------------------
+Unspecified: 112
+Neuron: 63
+Muscle: 32
+Pharynx: 25
+Death: 20
+Other: 7
+Skin: 4

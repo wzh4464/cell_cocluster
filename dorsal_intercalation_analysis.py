@@ -19,16 +19,432 @@ import nibabel as nib
 from scipy import ndimage
 import warnings
 from nibabel.nifti1 import load
+from mpl_toolkits.mplot3d import Axes3D
 
 warnings.filterwarnings("ignore")
 
 
+class FontConfig:
+    """统一字体配置类，支持缩放参数"""
+    
+    def __init__(self, scale_factor: float = 1.0):
+        self.scale_factor = scale_factor
+        
+    @property
+    def axis_label_size(self) -> int:
+        return int(16 * self.scale_factor)
+    
+    @property
+    def tick_label_size(self) -> int:
+        return int(14 * self.scale_factor)
+    
+    @property
+    def legend_size(self) -> int:
+        return int(12 * self.scale_factor)
+    
+    @property
+    def colorbar_size(self) -> int:
+        return int(14 * self.scale_factor)
+    
+    @property
+    def axis_weight(self) -> str:
+        return 'bold'
+
+
+class IntestinalPrimordiumAnalyzer:
+    """Analysis class for Intestinal Primordium Formation demo."""
+    
+    def __init__(self, font_config: FontConfig = None):
+        # E lineage cells (20 cells total) - using actual lineage names from report.md
+        self.e_lineage_cells = [
+            "int1DL", "int1VL", "int1DR", "int1VR",  # Ring 1 (4 cells)
+            "int2L", "int2R",                         # Ring 2 (2 cells) 
+            "int3L", "int3R",                         # Ring 3 (2 cells)
+            "int4L", "int4R",                         # Ring 4 (2 cells)
+            "int5L", "int5R",                         # Ring 5 (2 cells)
+            "int6L", "int6R",                         # Ring 6 (2 cells)
+            "int7L", "int7R",                         # Ring 7 (2 cells)
+            "int8L", "int8R",                         # Ring 8 (2 cells)
+            "int9L", "int9R"                          # Ring 9 (2 cells)
+        ]
+        self.font_config = font_config or FontConfig()
+        
+    def create_demo_intestinal_coclustering(self):
+        """Create demo co-clustering data for E lineage cells during gut formation."""
+        # Time range: 350-400 minutes (gut formation period)
+        time_range = np.arange(350, 401)
+        n_cells = 20  # 20 E lineage cells
+        
+        # Create probability matrix
+        prob_matrix = np.zeros((n_cells, len(time_range)))
+        
+        # Gut formation phases based on report.md knowledge
+        gastrulation_start = 350    # 原肠作用开始 (28-cell stage)
+        internalization_start = 355  # Ea/Ep内化开始
+        internalization_peak = 365   # 内化完成，细胞进入囊胚腔
+        proliferation_phase = 375    # E16细胞增殖期
+        primordium_formation = 385   # E20肠原基形成
+        tube_morphogenesis = 395     # 管腔形成与极化
+        
+        # Define cell ring positions for differential behavior
+        ring1_cells = [0, 1, 2, 3]  # int1 ring (4 cells, anterior)
+        ring2_9_cells = list(range(4, 20))  # int2-9 rings (16 cells)
+        
+        for i in range(n_cells):
+            for j, t in enumerate(time_range):
+                if gastrulation_start <= t < internalization_start:
+                    # 早期原肠作用：低聚类，细胞仍在表面
+                    base_prob = 0.15 + np.random.normal(0, 0.03)
+                elif internalization_start <= t < internalization_peak:
+                    # Ea/Ep内化阶段：快速聚类增加
+                    progress = (t - internalization_start) / (internalization_peak - internalization_start)
+                    base_prob = 0.2 + 0.5 * progress  # 0.2到0.7
+                elif internalization_peak <= t < proliferation_phase:
+                    # 内化后增殖期：中等聚类
+                    base_prob = 0.65 + np.random.normal(0, 0.05)
+                elif proliferation_phase <= t < primordium_formation:
+                    # E16到E20增殖期：聚类增强
+                    progress = (t - proliferation_phase) / (primordium_formation - proliferation_phase)
+                    base_prob = 0.7 + 0.2 * progress  # 0.7到0.9
+                elif primordium_formation <= t <= tube_morphogenesis:
+                    # 肠原基形成到管腔形成：最高聚类
+                    base_prob = 0.9 + np.random.normal(0, 0.02)
+                else:
+                    # 管腔形成后：稳定高聚类
+                    base_prob = 0.85 + np.random.normal(0, 0.03)
+                
+                # Ring-specific behavior: anterior cells (ring1) show stronger clustering
+                if i in ring1_cells:
+                    base_prob = min(base_prob * 1.05, 1.0)  # 5% boost for anterior cells
+                
+                # 添加基于同源嵌入的细胞间变异
+                cell_variation = np.random.normal(0, 0.04)
+                prob_matrix[i, j] = np.clip(base_prob + cell_variation, 0, 1)
+        
+        return prob_matrix, time_range
+    
+    def create_demo_intestinal_trajectory(self):
+        """Create demo trajectory data for E lineage internalization based on report.md."""
+        time_range = np.arange(350, 401)
+        trajectories = {}
+        
+        # 根据report.md，Ea和Ep细胞在28细胞期内化，随后增殖形成E20
+        # 前4个细胞代表早期Ea/Ep后代，其余16个代表后期增殖细胞
+        
+        for i, cell_id in enumerate(self.e_lineage_cells):
+            trajectory = []
+            
+            # Starting positions - 在胚胎腹侧表面排列
+            if i < 4:  # Early Ea/Ep descendants (int1 ring)
+                # 早期细胞位于肠道前端
+                start_x = 25 + i * 3 + np.random.normal(0, 1)
+                start_y = 0 + np.random.normal(0, 2)  # 围绕中线
+                start_z = 0 + np.random.normal(0, 0.5)  # 表面位置
+            else:  # Later proliferation descendants
+                # 后期增殖细胞沿前后轴分布
+                ring_idx = (i - 4) // 2  # Ring index (0-7 for rings 2-9)
+                side_idx = (i - 4) % 2   # Left/right side
+                start_x = 30 + ring_idx * 4 + np.random.normal(0, 1.5)
+                start_y = (side_idx - 0.5) * 4 + np.random.normal(0, 1.5)  # Left-right positioning
+                start_z = 0 + np.random.normal(0, 0.5)
+            
+            for j, t in enumerate(time_range):
+                # 根据report.md的发育阶段模拟运动
+                if t < 355:
+                    # 28细胞期前：细胞仍在表面
+                    x_pos = start_x + np.random.normal(0, 0.2)
+                    y_pos = start_y + np.random.normal(0, 0.2)
+                    z_pos = start_z + np.random.normal(0, 0.1)
+                    
+                elif 355 <= t <= 365:
+                    # Ea/Ep内化期：快速向内运动（负Z速度）
+                    progress = (t - 355) / 10.0
+                    
+                    if i < 4:  # Early internalizing cells
+                        # 顶端收缩驱动的内化运动
+                        z_pos = start_z - progress * (12 + np.random.normal(0, 1))
+                        # 轻微向中心收敛
+                        x_pos = start_x + progress * (2 * np.sign(start_y - 0))
+                        y_pos = start_y * (1 - 0.2 * progress)
+                    else:
+                        # Later cells follow more gradually
+                        z_pos = start_z - progress * (6 + np.random.normal(0, 1))
+                        x_pos = start_x + progress * np.random.normal(0, 1)
+                        y_pos = start_y + progress * np.random.normal(0, 1)
+                        
+                elif 365 < t <= 385:
+                    # 增殖期：细胞在囊胚腔内缓慢重排
+                    if i < 4:
+                        z_pos = start_z - 12 + np.random.normal(0, 1)
+                        x_pos = start_x + 2 * np.sign(start_y) + np.random.normal(0, 0.5)
+                        y_pos = start_y * 0.8 + np.random.normal(0, 0.5)
+                    else:
+                        progress_late = (t - 365) / 20.0
+                        z_pos = start_z - 6 - progress_late * 4
+                        x_pos = start_x + progress_late * np.random.normal(0, 2)
+                        y_pos = start_y + progress_late * np.random.normal(0, 1.5)
+                        
+                elif 385 < t <= 395:
+                    # 肠原基形成：向管状结构收敛
+                    progress_tube = (t - 385) / 10.0
+                    
+                    # 所有细胞向管状排列收敛
+                    target_radius = 8 if i < 4 else 6  # int1 ring略大
+                    angle = i * 2 * np.pi / len(self.e_lineage_cells)
+                    
+                    target_x = start_x
+                    target_y = target_radius * np.cos(angle)
+                    target_z = start_z - (12 if i < 4 else 10)
+                    
+                    x_pos = start_x + (target_x - start_x) * progress_tube + np.random.normal(0, 0.3)
+                    y_pos = start_y + (target_y - start_y) * progress_tube + np.random.normal(0, 0.3)
+                    z_pos = (start_z - (12 if i < 4 else 10)) + np.random.normal(0, 0.2)
+                    
+                else:  # t > 395
+                    # 管腔形成后：稳定的管状结构
+                    target_radius = 8 if i < 4 else 6
+                    angle = i * 2 * np.pi / len(self.e_lineage_cells)
+                    
+                    x_pos = start_x + np.random.normal(0, 0.2)
+                    y_pos = target_radius * np.cos(angle) + np.random.normal(0, 0.3)
+                    z_pos = start_z - (12 if i < 4 else 10) + np.random.normal(0, 0.2)
+                
+                trajectory.append([t, x_pos, y_pos, z_pos])
+            
+            trajectories[cell_id] = np.array(trajectory)
+        
+        return trajectories
+    
+    def create_demo_intestinal_velocity(self):
+        """Create demo velocity data showing apical constriction-driven internalization."""
+        trajectories = self.create_demo_intestinal_trajectory()
+        velocities = {}
+        
+        for i, (cell_id, trajectory) in enumerate(trajectories.items()):
+            if len(trajectory) > 1:
+                times = trajectory[:, 0]
+                x_coords = trajectory[:, 1]
+                y_coords = trajectory[:, 2] 
+                z_coords = trajectory[:, 3]  # Z coordinates (internalization)
+                
+                dt = np.diff(times)
+                dx = np.diff(x_coords)
+                dy = np.diff(y_coords)
+                dz = np.diff(z_coords)
+                
+                # 计算3D速度分量
+                vx = dx / dt
+                vy = dy / dt
+                vz = dz / dt  # 负值表示内化
+                
+                # 根据report.md知识，模拟顶端收缩的特征
+                apical_constriction_velocity = np.zeros_like(vz)
+                
+                for j, t in enumerate(times[1:]):
+                    if 355 <= t <= 365:  # 内化期
+                        # 顶端收缩驱动的内化：早期细胞更强
+                        if i < 4:  # Early Ea/Ep descendants
+                            # 强烈的顶端收缩，产生突发性负Z速度
+                            intensity = 1.0 - (t - 355) / 10.0  # 随时间递减
+                            apical_constriction_velocity[j] = -8.0 * intensity + np.random.normal(0, 0.5)
+                        else:
+                            # 后期细胞跟随性内化
+                            intensity = 0.6 - (t - 355) / 15.0
+                            apical_constriction_velocity[j] = -4.0 * intensity + np.random.normal(0, 0.3)
+                    elif 365 < t <= 385:
+                        # 增殖期：轻微的重排运动
+                        apical_constriction_velocity[j] = vz[j] * 0.3 + np.random.normal(0, 0.2)
+                    else:
+                        # 其他时期：维持缓慢运动
+                        apical_constriction_velocity[j] = vz[j] * 0.1 + np.random.normal(0, 0.1)
+                
+                velocities[cell_id] = {
+                    "times": times[1:],
+                    "velocity_x": vx,
+                    "velocity_y": vy, 
+                    "velocity_z": vz,  # 原始Z速度
+                    "apical_constriction_velocity": apical_constriction_velocity,  # 顶端收缩特征
+                    "speed_3d": np.sqrt(vx**2 + vy**2 + vz**2),  # 3D速度幅度
+                    "internalization_phase": i < 4  # 是否为早期内化细胞
+                }
+        
+        return velocities
+    
+    def plot_intestinal_coclustering_heatmap(self, save_path="intestinal_coclustering.png"):
+        """Plot E lineage co-clustering heatmap."""
+        prob_matrix, time_range = self.create_demo_intestinal_coclustering()
+        
+        plt.figure(figsize=(14, 10))
+        
+        sns.heatmap(
+            prob_matrix,
+            xticklabels=[str(t) if t % 10 == 0 else "" for t in time_range],
+            yticklabels=self.e_lineage_cells,
+            cmap="RdBu_r",
+            vmin=0,
+            vmax=1,
+            cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
+        )
+        
+        plt.xlabel("Time (minutes post-fertilization)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.ylabel("E Lineage Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        
+        # Update colorbar font size
+        cbar = plt.gca().collections[0].colorbar
+        cbar.ax.tick_params(labelsize=self.font_config.colorbar_size)
+        cbar.set_label("Co-clustering Probability", fontsize=self.font_config.colorbar_size, fontweight=self.font_config.axis_weight)
+        
+        # Add phase annotations based on report.md gut morphogenesis stages
+        phase_lines = [
+            (5, 'red', 'Ea/Ep内化'),      # 355 min - internalization start
+            (15, 'orange', '内化完成'),     # 365 min - internalization complete  
+            (25, 'green', 'E16增殖'),      # 375 min - proliferation phase
+            (35, 'blue', 'E20原基'),       # 385 min - primordium formation
+            (45, 'purple', '管腔形成')      # 395 min - tube morphogenesis
+        ]
+        
+        for x_pos, color, label in phase_lines:
+            plt.axvline(x=x_pos, color=color, linestyle='--', alpha=0.7, linewidth=1.5)
+            
+        # Add text annotations for major phases  
+        plt.text(2, len(self.e_lineage_cells)-2, '原肠作用', fontsize=self.font_config.legend_size-2, 
+                rotation=90, alpha=0.8, color='red')
+        plt.text(10, len(self.e_lineage_cells)-2, '内化期', fontsize=self.font_config.legend_size-2,
+                rotation=90, alpha=0.8, color='orange') 
+        plt.text(30, len(self.e_lineage_cells)-2, '增殖期', fontsize=self.font_config.legend_size-2,
+                rotation=90, alpha=0.8, color='green')
+        plt.text(40, len(self.e_lineage_cells)-2, '形态建成', fontsize=self.font_config.legend_size-2,
+                rotation=90, alpha=0.8, color='blue')
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+    
+    def plot_intestinal_trajectories(self, save_path="intestinal_trajectories.png"):
+        """Plot E lineage internalization trajectories."""
+        trajectories = self.create_demo_intestinal_trajectory()
+        
+        fig = plt.figure(figsize=(12, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        colors = plt.cm.get_cmap("viridis")(np.linspace(0, 1, len(trajectories)))
+        
+        for i, (cell_id, trajectory) in enumerate(trajectories.items()):
+            ax.plot(trajectory[:, 1], trajectory[:, 2], trajectory[:, 3], 
+                   color=colors[i], alpha=0.7, linewidth=1.5)
+            
+            # Mark start and end points
+            ax.scatter(trajectory[0, 1], trajectory[0, 2], trajectory[0, 3],
+                      color='green', s=50, alpha=0.8)
+            ax.scatter(trajectory[-1, 1], trajectory[-1, 2], trajectory[-1, 3],
+                      color='red', s=50, alpha=0.8)
+        
+        ax.set_xlabel("Anterior-Posterior (μm)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.set_ylabel("Left-Right (μm)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.set_zlabel("Dorsal-Ventral (μm)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+    
+    def plot_intestinal_velocity_field(self, save_path="intestinal_velocity.png"):
+        """Plot internalization velocity field (negative Z velocity)."""
+        velocities = self.create_demo_intestinal_velocity()
+        
+        plt.figure(figsize=(12, 8))
+        
+        all_velocities = []
+        all_times = []
+        
+        for cell_id, data in velocities.items():
+            all_times.extend(data["times"])
+            all_velocities.extend(data["velocity"])
+        
+        # Create time bins for velocity analysis
+        time_bins = np.arange(350, 400, 5)
+        velocity_stats = []
+        
+        for t in time_bins:
+            time_mask = (np.array(all_times) >= t) & (np.array(all_times) < t + 5)
+            if np.any(time_mask):
+                bin_velocities = np.array(all_velocities)[time_mask]
+                velocity_stats.append(bin_velocities)
+            else:
+                velocity_stats.append([])
+        
+        # Create violin plot
+        positions = [t for i, t in enumerate(time_bins) if len(velocity_stats[i]) > 0]
+        data_to_plot = [v for v in velocity_stats if len(v) > 0]
+        
+        plt.violinplot(data_to_plot, positions=positions, widths=3)
+        
+        plt.xlabel("Time (minutes post-fertilization)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.ylabel("Internalization Velocity (μm/min)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        plt.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+        plt.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+    
+    def plot_intestinal_coclustering_features_pie(self, save_path="intestinal_coclustering_features_pie.png"):
+        """Create pie chart showing intestinal morphogenesis co-clustering feature distribution."""
+        # Quantitative local geometrical features measurable in co-clustering analysis
+        features = {
+            'Z-axis Velocity': 28,           # Primary: internalization rate (negative)
+            'Apical Surface Area': 24,       # Constriction measurement
+            'Cell Volume Change': 19,        # Compression during internalization
+            'Radial Distance': 14,           # Distance from gut center axis
+            'Cell Sphericity': 10,           # Roundness measure
+            'Neighbor Contact Number': 5     # Connectivity in clustering
+        }
+        
+        # Colors representing different geometrical aspects
+        colors = ['#C0392B', '#2980B9', '#27AE60', '#E67E22', '#8E44AD', '#16A085']
+        
+        plt.figure(figsize=(10, 8))
+        
+        # Create pie chart
+        wedges, texts, autotexts = plt.pie(
+            features.values(), 
+            labels=features.keys(),
+            colors=colors,
+            autopct='%1.1f%%',
+            startangle=45,
+            textprops={'fontsize': self.font_config.legend_size, 'fontweight': 'bold'}
+        )
+        
+        # Enhance the appearance
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontsize(self.font_config.legend_size)
+            autotext.set_fontweight('bold')
+        
+        plt.title('Intestinal Morphogenesis Co-clustering Features\nQuantitative Local Geometrical Properties', 
+                 fontsize=self.font_config.axis_label_size, 
+                 fontweight=self.font_config.axis_weight, pad=20)
+        
+        plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+
+
 class DorsalIntercalationAnalyzer:
-    def __init__(self, data_dir="DATA"):
+    def __init__(self, data_dir="DATA", font_config: FontConfig = None):
         self.data_dir = Path(data_dir)
         self.dorsal_cells = self.load_dorsal_cells()
         self.name_dict = self.load_name_dictionary()
         self.dorsal_cell_ids = self.find_dorsal_cell_ids()
+        self.font_config = font_config or FontConfig()
 
     def load_dorsal_cells(self):
         """Load dorsal intercalation cell names."""
@@ -344,7 +760,7 @@ class DorsalIntercalationAnalyzer:
             # Use demo data for ideal visualization
             left_matrix, right_matrix, time_range = self.create_demo_coclustering_data()
 
-            # Create separate left/right heatmaps
+            # Create separate left/right heatmaps with larger fonts
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
 
             # Left side heatmap
@@ -358,9 +774,10 @@ class DorsalIntercalationAnalyzer:
                 cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
                 ax=ax1,
             )
-            ax1.set_xlabel("Time (minutes)")
-            ax1.set_ylabel("Left Dorsal Cells")
-
+            ax1.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+            ax1.set_ylabel("Left Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+            ax1.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+            
             # Right side heatmap
             sns.heatmap(
                 right_matrix,
@@ -372,8 +789,137 @@ class DorsalIntercalationAnalyzer:
                 cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
                 ax=ax2,
             )
-            ax2.set_xlabel("Time (minutes)")
-            ax2.set_ylabel("Right Dorsal Cells")
+            ax2.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+            ax2.set_ylabel("Right Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+            ax2.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+            
+            # Update colorbar font sizes
+            cbar1 = ax1.collections[0].colorbar
+            cbar2 = ax2.collections[0].colorbar
+            cbar1.ax.tick_params(labelsize=self.font_config.colorbar_size)
+            cbar1.set_label("Co-clustering Probability", fontsize=self.font_config.colorbar_size, fontweight=self.font_config.axis_weight)
+            cbar2.ax.tick_params(labelsize=self.font_config.colorbar_size)
+            cbar2.set_label("Co-clustering Probability", fontsize=self.font_config.colorbar_size, fontweight=self.font_config.axis_weight)
+
+            plt.tight_layout()
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+            plt.close()
+            return save_path
+    
+    def plot_left_coclustering_heatmap(self, save_path: Union[str, Path] = "left_coclustering_heatmap.png"):
+        """Generate left side co-clustering probability heatmap in square format."""
+        left_matrix, _, time_range = self.create_demo_coclustering_data()
+        
+        # Create square figure
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        
+        # Left side heatmap
+        sns.heatmap(
+            left_matrix,
+            xticklabels=[str(t) if t % 5 == 0 else "" for t in time_range],
+            yticklabels=[f"L{i+1:02d}" for i in range(left_matrix.shape[0])],
+            cmap="RdBu_r",
+            vmin=0,
+            vmax=1,
+            cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
+            ax=ax,
+        )
+        ax.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.set_ylabel("Left Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        
+        # Update colorbar font size
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=self.font_config.colorbar_size)
+        cbar.set_label("Co-clustering Probability", fontsize=self.font_config.colorbar_size, fontweight=self.font_config.axis_weight)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+    
+    def plot_right_coclustering_heatmap(self, save_path: Union[str, Path] = "right_coclustering_heatmap.png"):
+        """Generate right side co-clustering probability heatmap in square format."""
+        _, right_matrix, time_range = self.create_demo_coclustering_data()
+        
+        # Create square figure
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        
+        # Right side heatmap
+        sns.heatmap(
+            right_matrix,
+            xticklabels=[str(t) if t % 5 == 0 else "" for t in time_range],
+            yticklabels=[f"R{i+1:02d}" for i in range(right_matrix.shape[0])],
+            cmap="RdBu_r",
+            vmin=0,
+            vmax=1,
+            cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
+            ax=ax,
+        )
+        ax.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.set_ylabel("Right Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        
+        # Update colorbar font size
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=self.font_config.colorbar_size)
+        cbar.set_label("Co-clustering Probability", fontsize=self.font_config.colorbar_size, fontweight=self.font_config.axis_weight)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+    
+    def plot_combined_coclustering_heatmap(
+        self,
+        save_path: Union[str, Path] = "coclustering_heatmap.png",
+        use_demo_data: bool = False,
+    ):
+        """Generate original combined co-clustering probability heatmap (for backwards compatibility)."""
+        if use_demo_data:
+            # Use demo data for ideal visualization
+            left_matrix, right_matrix, time_range = self.create_demo_coclustering_data()
+
+            # Create separate left/right heatmaps with larger fonts
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+
+            # Left side heatmap
+            sns.heatmap(
+                left_matrix,
+                xticklabels=[str(t) if t % 5 == 0 else "" for t in time_range],
+                yticklabels=[f"L{i+1:02d}" for i in range(left_matrix.shape[0])],
+                cmap="RdBu_r",
+                vmin=0,
+                vmax=1,
+                cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
+                ax=ax1,
+            )
+            ax1.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+            ax1.set_ylabel("Left Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+            ax1.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+            
+            # Right side heatmap
+            sns.heatmap(
+                right_matrix,
+                xticklabels=[str(t) if t % 5 == 0 else "" for t in time_range],
+                yticklabels=[f"R{i+1:02d}" for i in range(right_matrix.shape[0])],
+                cmap="RdBu_r",
+                vmin=0,
+                vmax=1,
+                cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
+                ax=ax2,
+            )
+            ax2.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+            ax2.set_ylabel("Right Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+            ax2.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+            
+            # Update colorbar font sizes
+            cbar1 = ax1.collections[0].colorbar
+            cbar2 = ax2.collections[0].colorbar
+            cbar1.ax.tick_params(labelsize=self.font_config.colorbar_size)
+            cbar1.set_label("Co-clustering Probability", fontsize=self.font_config.colorbar_size, fontweight=self.font_config.axis_weight)
+            cbar2.ax.tick_params(labelsize=self.font_config.colorbar_size)
+            cbar2.set_label("Co-clustering Probability", fontsize=self.font_config.colorbar_size, fontweight=self.font_config.axis_weight)
 
             plt.tight_layout()
             plt.savefig(save_path, dpi=300, bbox_inches="tight")
@@ -404,30 +950,92 @@ class DorsalIntercalationAnalyzer:
             plt.ylabel("Dorsal Cell ID")
             return self._save_velocity_field_plot(save_path)
 
+    def create_demo_trajectory_data(self):
+        """Create demo cell trajectory data showing dorsal intercalation movement."""
+        time_range = np.arange(220, 251)
+        trajectories = {}
+        
+        # Generate trajectories for left side cells (negative Y, moving toward midline)
+        for i in range(6):
+            cell_id = f"L{i+1:02d}"
+            trajectory = []
+            
+            # Starting positions (left side)
+            start_x = 50 + np.random.normal(0, 5)
+            start_y = -30 - i*5 + np.random.normal(0, 2)
+            start_z = 20 + np.random.normal(0, 3)
+            
+            for j, t in enumerate(time_range):
+                if 225 <= t <= 240:
+                    progress = (t - 225) / 15.0
+                    y_pos = start_y + progress * (15 + i*2)
+                    x_pos = start_x + progress * (5 + np.random.normal(0, 1))
+                else:
+                    y_pos = start_y if t < 225 else start_y + (15 + i*2)
+                    x_pos = start_x if t < 225 else start_x + 5
+                
+                x_pos += np.random.normal(0, 0.5)
+                y_pos += np.random.normal(0, 0.5)
+                z_pos = start_z + np.random.normal(0, 0.3)
+                
+                trajectory.append([t, x_pos, y_pos, z_pos])
+            
+            trajectories[cell_id] = np.array(trajectory)
+        
+        # Generate trajectories for right side cells
+        for i in range(6):
+            cell_id = f"R{i+1:02d}"
+            trajectory = []
+            
+            start_x = 50 + np.random.normal(0, 5)
+            start_y = 30 + i*5 + np.random.normal(0, 2)
+            start_z = 20 + np.random.normal(0, 3)
+            
+            for j, t in enumerate(time_range):
+                if 225 <= t <= 240:
+                    progress = (t - 225) / 15.0
+                    y_pos = start_y - progress * (15 + i*2)
+                    x_pos = start_x + progress * (5 + np.random.normal(0, 1))
+                else:
+                    y_pos = start_y if t < 225 else start_y - (15 + i*2)
+                    x_pos = start_x if t < 225 else start_x + 5
+                
+                x_pos += np.random.normal(0, 0.5)
+                y_pos += np.random.normal(0, 0.5)
+                z_pos = start_z + np.random.normal(0, 0.3)
+                
+                trajectory.append([t, x_pos, y_pos, z_pos])
+            
+            trajectories[cell_id] = np.array(trajectory)
+        
+        return trajectories
+
     def plot_cell_trajectories(
-        self, save_path: Union[str, Path] = "cell_trajectories.png"
+        self, save_path: Union[str, Path] = "cell_trajectories.png", use_demo_data: bool = True
     ):
         """Generate cell trajectory visualization."""
-        if len(self.dorsal_cell_ids) == 0:
-            print("No dorsal cells found, skipping trajectories")
-            return None
+        if use_demo_data:
+            trajectories = self.create_demo_trajectory_data()
+        else:
+            if len(self.dorsal_cell_ids) == 0:
+                print("No dorsal cells found, using demo data")
+                trajectories = self.create_demo_trajectory_data()
+            else:
+                trajectories = self.calculate_trajectories()
+                if not trajectories:
+                    print("No trajectory data found, using demo data")
+                    trajectories = self.create_demo_trajectory_data()
 
-        trajectories = self.calculate_trajectories()
-
-        if not trajectories:
-            print("No trajectory data found, skipping trajectories")
-            return None
-
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(12, 10))
 
         colors = plt.cm.get_cmap("tab20")(np.linspace(0, 1, len(trajectories)))
 
         for i, (cell_id, trajectory) in enumerate(trajectories.items()):
             if len(trajectory) > 1:
-                # Plot trajectory
+                # Plot trajectory (Y vs X for top view)
                 plt.plot(
-                    trajectory[:, 2],
-                    trajectory[:, 3],
+                    trajectory[:, 2],  # Y coordinates (left-right)
+                    trajectory[:, 1],  # X coordinates (anterior-posterior)
                     color=colors[i],
                     alpha=0.7,
                     linewidth=2,
@@ -437,7 +1045,7 @@ class DorsalIntercalationAnalyzer:
                 # Mark start and end points
                 plt.scatter(
                     trajectory[0, 2],
-                    trajectory[0, 3],
+                    trajectory[0, 1],
                     color="green",
                     s=100,
                     marker="o",
@@ -446,7 +1054,7 @@ class DorsalIntercalationAnalyzer:
                 )
                 plt.scatter(
                     trajectory[-1, 2],
-                    trajectory[-1, 3],
+                    trajectory[-1, 1],
                     color="red",
                     s=100,
                     marker="s",
@@ -454,13 +1062,11 @@ class DorsalIntercalationAnalyzer:
                     zorder=5,
                 )
 
-        plt.axvline(x=0, color="black", linestyle="--", alpha=0.5, label="Midline")
-        self._set_plot_labels(
-            "Anterior-Posterior Axis (μm)",
-            "Left-Right Axis (μm)",
-            "Cell Trajectory Visualization\nDorsal Intercalation (220-250 min)",
-        )
-        plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+        plt.axvline(x=0, color="black", linestyle="--", alpha=0.7, linewidth=2, label="Midline")
+        plt.xlabel("Left-Right Axis (μm)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.ylabel("Anterior-Posterior Axis (μm)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=self.font_config.legend_size)
         return self._save_velocity_field_plot(save_path)
 
     def plot_morphological_irregularity(
@@ -532,9 +1138,36 @@ class DorsalIntercalationAnalyzer:
         plt.grid(True, alpha=0.3)
         return self._save_velocity_field_plot(save_path)
 
-    def plot_velocity_field(self, save_path: Union[str, Path] = "velocity_field.png"):
+    def create_demo_velocity_data(self):
+        """Create demo velocity field data showing dorsal intercalation dynamics."""
+        trajectories = self.create_demo_trajectory_data()
+        velocities = {}
+        
+        for cell_id, trajectory in trajectories.items():
+            if len(trajectory) > 1:
+                times = trajectory[:, 0]
+                y_coords = trajectory[:, 2]  # Y coordinates (toward midline)
+                
+                dt = np.diff(times)
+                dy = np.diff(y_coords)
+                velocity = dy / dt
+                
+                velocities[cell_id] = {
+                    "times": times[1:],
+                    "velocity": velocity,
+                }
+        
+        return velocities
+
+    def plot_velocity_field(self, save_path: Union[str, Path] = "velocity_field.png", use_demo_data: bool = True):
         """Generate velocity field analysis plot."""
-        velocities = self.calculate_midline_velocity()
+        if use_demo_data:
+            velocities = self.create_demo_velocity_data()
+        else:
+            velocities = self.calculate_midline_velocity()
+            if not velocities:
+                print("No velocity data found, using demo data")
+                velocities = self.create_demo_velocity_data()
 
         plt.figure(figsize=(12, 8))
 
@@ -547,32 +1180,29 @@ class DorsalIntercalationAnalyzer:
             all_velocities.extend(data["velocity"])
 
         # Create time bins
-        time_bins = np.arange(220, 250, 2)  # Every 2 minutes
+        time_bins = np.arange(220, 250, 3)  # Every 3 minutes
 
         # Calculate statistics for each time bin
         velocity_stats = []
         for t in time_bins:
-            time_mask = (np.array(all_times) >= t) & (np.array(all_times) < t + 2)
+            time_mask = (np.array(all_times) >= t) & (np.array(all_times) < t + 3)
             if np.any(time_mask):
                 bin_velocities = np.array(all_velocities)[time_mask]
                 velocity_stats.append(bin_velocities)
             else:
                 velocity_stats.append([])
 
-        # Create box plot
-        plt.boxplot(
-            [v for v in velocity_stats if len(v) > 0],
-            positions=[
-                t for i, t in enumerate(time_bins) if len(velocity_stats[i]) > 0
-            ],
-            widths=1.5,
-        )
+        # Create violin plot for better visualization
+        positions = [t for i, t in enumerate(time_bins) if len(velocity_stats[i]) > 0]
+        data_to_plot = [v for v in velocity_stats if len(v) > 0]
+        
+        if data_to_plot:
+            plt.violinplot(data_to_plot, positions=positions, widths=2)
 
-        self._set_plot_labels(
-            "Time (minutes post-fertilization)",
-            "Midline Crossing Velocity (μm/min)",
-            "Velocity Field Analysis\nDorsal Intercalation Cells",
-        )
+        plt.xlabel("Time (minutes post-fertilization)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.ylabel("Midline Crossing Velocity (μm/min)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        plt.axhline(y=0, color='black', linestyle='--', alpha=0.5)
         plt.grid(True, alpha=0.3)
         return self._save_velocity_field_plot(save_path)
 
@@ -587,44 +1217,123 @@ class DorsalIntercalationAnalyzer:
         plt.close()
         return save_path
 
-    def generate_all_plots(self, output_dir="dorsal_plots"):
-        """Generate all required plots using a function table (dictionary of function pointers)."""
+    def plot_dorsal_coclustering_features_pie(self, save_path: Union[str, Path] = "dorsal_coclustering_features_pie.png"):
+        """Create pie chart showing dorsal intercalation co-clustering feature distribution."""
+        # Quantitative local geometrical features measurable in co-clustering analysis
+        features = {
+            'Y-axis Velocity': 26,           # Primary: medial movement velocity
+            'Cell Elongation Ratio': 21,     # Aspect ratio during wedge formation  
+            'Surface Curvature': 18,         # Shape changes during migration
+            'Local Cell Density': 15,        # Clustering intensity measure
+            'Directional Persistence': 12,   # Movement direction consistency
+            'Cell-Cell Contact Area': 8      # Adhesion strength indicator
+        }
+        
+        # Colors representing different geometrical aspects
+        colors = ['#E74C3C', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6', '#1ABC9C']
+        
+        plt.figure(figsize=(10, 8))
+        
+        # Create pie chart
+        wedges, texts, autotexts = plt.pie(
+            features.values(), 
+            labels=features.keys(),
+            colors=colors,
+            autopct='%1.1f%%',
+            startangle=90,
+            textprops={'fontsize': self.font_config.legend_size, 'fontweight': 'bold'}
+        )
+        
+        # Enhance the appearance
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontsize(self.font_config.legend_size)
+            autotext.set_fontweight('bold')
+        
+        plt.title('Dorsal Intercalation Co-clustering Features\nQuantitative Local Geometrical Properties', 
+                 fontsize=self.font_config.axis_label_size, 
+                 fontweight=self.font_config.axis_weight, pad=20)
+        
+        plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+
+    def generate_all_plots(self, output_dir="demo_plots"):
+        """Generate all required plots including dorsal intercalation demos and intestinal primordium demos."""
         output_dir = Path(output_dir)
         output_dir.mkdir(exist_ok=True)
 
         plots = {}
+        
+        # Initialize intestinal analyzer with same font config
+        intestinal_analyzer = IntestinalPrimordiumAnalyzer(font_config=self.font_config)
 
-        if len(self.dorsal_cell_ids) == 0:
-            print("No dorsal cells found, cannot generate plots")
-            return plots
-
-        # 定义函数表，key为plot类型，value为(方法, 保存路径, 参数)
+        # 定义完整的函数表，生成8张图：4个dorsal demo + 3个intestinal demo + 2个pie charts
         plot_table = {
-            "heatmap": (
-                self.plot_coclustering_heatmap,
-                output_dir / "PanelA_coclustering_heatmap.png",
+            # Dorsal Intercalation Demos (4 figures - separate left/right heatmaps)
+            "dorsal_left_coclustering": (
+                self.plot_left_coclustering_heatmap,
+                output_dir / "Demo1A_Dorsal_Left_Coclustering_Heatmap.png",
                 {},
             ),
-            "feature_pie": (
-                self.plot_feature_pie_chart,
-                output_dir / "PanelB_feature_distribution.png",
+            "dorsal_right_coclustering": (
+                self.plot_right_coclustering_heatmap,
+                output_dir / "Demo1B_Dorsal_Right_Coclustering_Heatmap.png",
                 {},
             ),
-            "demo_heatmap": (
-                self.plot_coclustering_heatmap,
-                output_dir / "demo_ideal_coclustering.png",
+            "dorsal_trajectories": (
+                self.plot_cell_trajectories,
+                output_dir / "Demo2_Dorsal_Cell_Trajectories.png",
                 {"use_demo_data": True},
             ),
-            # "trajectories": (self.plot_cell_trajectories, output_dir / "PanelC_cell_trajectories.png", {}),
-            # "irregularity": (self.plot_morphological_irregularity, output_dir / "PanelD_morphological_irregularity.png", {}),
-            # "velocity": (self.plot_velocity_field, output_dir / "PanelE_velocity_field.png", {}),
+            "dorsal_velocity": (
+                self.plot_velocity_field,
+                output_dir / "Demo3_Dorsal_Velocity_Field.png",
+                {"use_demo_data": True},
+            ),
+            
+            # Intestinal Primordium Formation Demos (3 figures)
+            "intestinal_coclustering": (
+                intestinal_analyzer.plot_intestinal_coclustering_heatmap,
+                output_dir / "Demo4_Intestinal_Coclustering_Heatmap.png",
+                {},
+            ),
+            "intestinal_trajectories": (
+                intestinal_analyzer.plot_intestinal_trajectories,
+                output_dir / "Demo5_Intestinal_Trajectories.png",
+                {},
+            ),
+            "intestinal_velocity": (
+                intestinal_analyzer.plot_intestinal_velocity_field,
+                output_dir / "Demo6_Intestinal_Velocity_Field.png",
+                {},
+            ),
+            
+            # Co-clustering Feature Analysis Pie Charts
+            "dorsal_features_pie": (
+                self.plot_dorsal_coclustering_features_pie,
+                output_dir / "Demo7A_Dorsal_Coclustering_Features_Pie.png",
+                {},
+            ),
+            "intestinal_features_pie": (
+                intestinal_analyzer.plot_intestinal_coclustering_features_pie,
+                output_dir / "Demo7B_Intestinal_Coclustering_Features_Pie.png",
+                {},
+            ),
         }
 
         for plot_name, (plot_func, save_path, kwargs) in plot_table.items():
-            print(f"Generating {plot_name} plot...")
-            result = plot_func(save_path, **kwargs)
-            if result:
-                plots[plot_name] = result
+            print(f"Generating {plot_name} demo...")
+            try:
+                result = plot_func(save_path, **kwargs)
+                if result:
+                    plots[plot_name] = result
+                    print(f"✓ {plot_name} saved to: {result}")
+            except Exception as e:
+                print(f"✗ Error generating {plot_name}: {e}")
 
         return plots
 

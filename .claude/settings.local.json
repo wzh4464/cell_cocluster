@@ -3,7 +3,10 @@
     "allow": [
       "Bash(.venv/bin/python:*)",
       "Bash(uv add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
