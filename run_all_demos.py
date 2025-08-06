@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
 统一demo调用脚本
-生成8张demo图：
+生成7张demo图：
 1. Demo1A_Dorsal_Left_Coclustering_Heatmap.png - 背侧嵌入左侧共聚类热图
 2. Demo1B_Dorsal_Right_Coclustering_Heatmap.png - 背侧嵌入右侧共聚类热图
 3. Demo2_Dorsal_Cell_Trajectories.png - 背侧细胞轨迹图
-4. Demo3_Dorsal_Velocity_Field.png - 背侧速度场分析
-5. Demo4_Intestinal_Coclustering_Heatmap.png - 肠原基形成共聚类热图
-6. Demo5_Intestinal_Trajectories.png - 肠原基细胞轨迹图（3D内化）
-7. Demo6_Intestinal_Velocity_Field.png - 肠原基速度场分析
-8. Demo7A_Dorsal_Coclustering_Features_Pie.png - Dorsal intercalation geometrical features
-9. Demo7B_Intestinal_Coclustering_Features_Pie.png - Intestinal morphogenesis geometrical features
+4. Demo4_Center_High_Coclustering_Heatmap.png - 时间递减共聚类热图（后半段整体下降）
+5. Demo6_Intestinal_Velocity_Field.png - 肠原基速度场分析
+6. Demo7A_Dorsal_Coclustering_Features_Pie.png - Dorsal intercalation geometrical features
+7. Demo7B_Intestinal_Coclustering_Features_Pie.png - Intestinal morphogenesis geometrical features
 
 使用方法:
     python run_all_demos.py                    # 默认字体大小
@@ -38,7 +36,7 @@ def main():
     print("=" * 50)
     print(f"字体缩放因子: {args.font_scale}")
     print(f"输出目录: {args.output_dir}")
-    print("正在生成8张demo图表...")
+    print("正在生成7张demo图表...")
     print()
     
     start_time = time.time()
@@ -65,9 +63,7 @@ def main():
         "dorsal_left_coclustering": "🔥 背侧嵌入左侧共聚类热图",
         "dorsal_right_coclustering": "🔥 背侧嵌入右侧共聚类热图",
         "dorsal_trajectories": "🔄 背侧细胞轨迹分析", 
-        "dorsal_velocity": "💨 背侧速度场动态",
-        "intestinal_coclustering": "🍎 肠原基形成共聚类",
-        "intestinal_trajectories": "📐 E谱系内化轨迹（3D）",
+        "demo4_coclustering": "🎯 时间递减共聚类热图（后半段整体下降）",
         "intestinal_velocity": "⬇️  内化速度场分析",
         "dorsal_features_pie": "🥧 Dorsal Co-clustering Features Pie",
         "intestinal_features_pie": "🥧 Intestinal Co-clustering Features Pie"
@@ -83,6 +79,11 @@ def main():
     print("   - 220-250分钟发育时期")
     print("   - 细胞跨中线运动模式")
     print("   - 左右分群聚类行为")
+    print()
+    print("🎯 Demo4时间递减模式:")
+    print("   - 所有细胞均匀高概率期(225-240分钟)")
+    print("   - 后半段时间整体概率下降(240-255分钟)")
+    print("   - 展示统一的时间性概率递减模式")
     print()
     print("🍼 肠原基形成(Intestinal Primordium):")
     print("   - 350-400分钟发育时期")

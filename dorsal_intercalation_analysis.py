@@ -685,6 +685,50 @@ class DorsalIntercalationAnalyzer:
 
         return left_matrix, right_matrix, time_range
 
+    def create_demo4_coclustering_data(self):
+        """Create Demo4 co-clustering data with uniform high probability, then overall decline in later time."""
+        # Time range: 220-255 minutes (discrete integer minutes)
+        time_range = np.arange(220, 256)
+        n_cells_total = 12  # Total cells in a single heatmap
+        
+        # Create single probability matrix with temporal decline pattern
+        prob_matrix = np.zeros((n_cells_total, len(time_range)))
+        
+        # Time periods for clustering with overall decline
+        cluster_rise_start = 225
+        cluster_rise_end = 230
+        cluster_high_start = 230
+        cluster_high_end = 240  # High period ends earlier
+        cluster_decline_start = 240  # Start of decline period
+        cluster_decline_end = 255
+        
+        for i in range(n_cells_total):
+            for j, t in enumerate(time_range):
+                if cluster_rise_start <= t <= cluster_rise_end:
+                    # 225-230分钟快速上升 - 所有细胞均匀上升
+                    progress = (t - cluster_rise_start) / (cluster_rise_end - cluster_rise_start)
+                    base_prob = 0.2 + 0.75 * progress  # 0.2到0.95
+                elif cluster_high_start < t < cluster_decline_start:
+                    # 230-240分钟保持高概率 - 所有细胞均匀高概率
+                    base_prob = 0.95 + np.random.normal(0, 0.02)
+                elif cluster_decline_start <= t <= cluster_decline_end:
+                    # 240-255分钟整体概率下降 - 所有细胞一起下降
+                    decline_progress = (t - cluster_decline_start) / (cluster_decline_end - cluster_decline_start)
+                    # 从0.95逐渐下降到0.3
+                    base_prob = 0.95 - 0.65 * decline_progress + np.random.normal(0, 0.03)
+                else:
+                    # 其他时间低概率
+                    base_prob = 0.1 + np.random.normal(0, 0.02)
+                
+                # 加入细胞间微小噪声
+                noise = np.random.normal(0, 0.03)
+                prob_matrix[i, j] = base_prob + noise
+        
+        # Ensure probabilities are in [0, 1] range
+        prob_matrix = np.clip(prob_matrix, 0, 1)
+        
+        return prob_matrix, time_range
+
     def analyze_coclustering_features(self):
         """Analyze features in dorsal co-clustering for pie chart."""
         prob_matrix, time_range = self.calculate_coclustering_probabilities()
@@ -876,6 +920,39 @@ class DorsalIntercalationAnalyzer:
         )
         ax.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
         ax.set_ylabel("Right Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.tick_params(axis='y', which='major', labelsize=self.font_config.tick_label_size)
+        ax.tick_params(axis='x', which='major', labelsize=int(self.font_config.tick_label_size * 0.8))  # Smaller x-tick labels
+        
+        # Update colorbar font size
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=self.font_config.colorbar_size)
+        cbar.set_label("Co-clustering Probability", fontsize=self.font_config.colorbar_size, fontweight=self.font_config.axis_weight)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close()
+        return save_path
+    
+    def plot_demo4_coclustering_heatmap(self, save_path: Union[str, Path] = "demo4_coclustering_heatmap.png"):
+        """Generate Demo4 co-clustering probability heatmap with low left/right and high center pattern."""
+        prob_matrix, time_range = self.create_demo4_coclustering_data()
+        
+        # Create square figure
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        
+        # Demo4 heatmap
+        sns.heatmap(
+            prob_matrix,
+            xticklabels=[str(t) if t % 5 == 0 else "" for t in time_range],
+            yticklabels=[f"C{i+1:02d}" for i in range(prob_matrix.shape[0])],
+            cmap="RdBu_r",
+            vmin=0,
+            vmax=1,
+            cbar_kws={"label": "Co-clustering Probability", "shrink": 0.8},
+            ax=ax,
+        )
+        ax.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.set_ylabel("Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
         ax.tick_params(axis='y', which='major', labelsize=self.font_config.tick_label_size)
         ax.tick_params(axis='x', which='major', labelsize=int(self.font_config.tick_label_size * 0.8))  # Smaller x-tick labels
         
@@ -1291,9 +1368,9 @@ class DorsalIntercalationAnalyzer:
         # Initialize intestinal analyzer with same font config
         intestinal_analyzer = IntestinalPrimordiumAnalyzer(font_config=self.font_config)
 
-        # 定义完整的函数表，生成8张图：4个dorsal demo + 3个intestinal demo + 2个pie charts
+        # 定义完整的函数表，生成6张图：3个dorsal demo + 2个intestinal demo + 2个pie charts
         plot_table = {
-            # Dorsal Intercalation Demos (4 figures - separate left/right heatmaps)
+            # Dorsal Intercalation Demos (3 figures - separate left/right heatmaps + new demo4)
             "dorsal_left_coclustering": (
                 self.plot_left_coclustering_heatmap,
                 output_dir / "Demo1A_Dorsal_Left_Coclustering_Heatmap.png",
@@ -1309,23 +1386,14 @@ class DorsalIntercalationAnalyzer:
                 output_dir / "Demo2_Dorsal_Cell_Trajectories.png",
                 {"use_demo_data": True},
             ),
-            "dorsal_velocity": (
-                self.plot_velocity_field,
-                output_dir / "Demo3_Dorsal_Velocity_Field.png",
-                {"use_demo_data": True},
+            # New Demo4 with low left/right, high center pattern
+            "demo4_coclustering": (
+                self.plot_demo4_coclustering_heatmap,
+                output_dir / "Demo4_Center_High_Coclustering_Heatmap.png",
+                {},
             ),
             
-            # Intestinal Primordium Formation Demos (3 figures)
-            "intestinal_coclustering": (
-                intestinal_analyzer.plot_intestinal_coclustering_heatmap,
-                output_dir / "Demo4_Intestinal_Coclustering_Heatmap.png",
-                {},
-            ),
-            "intestinal_trajectories": (
-                intestinal_analyzer.plot_intestinal_trajectories,
-                output_dir / "Demo5_Intestinal_Trajectories.png",
-                {},
-            ),
+            # Intestinal Primordium Formation Demos (1 figure - removed Demo5 trajectories)
             "intestinal_velocity": (
                 intestinal_analyzer.plot_intestinal_velocity_field,
                 output_dir / "Demo6_Intestinal_Velocity_Field.png",
