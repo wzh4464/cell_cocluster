@@ -23,6 +23,18 @@ from mpl_toolkits.mplot3d import Axes3D
 
 warnings.filterwarnings("ignore")
 
+# Set Times New Roman as the default font for all plots
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Times New Roman', 'Times', 'DejaVu Serif', 'serif']
+plt.rcParams['mathtext.fontset'] = 'stix'  # For mathematical text
+# Ensure consistent font rendering
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.titlesize'] = 'large'
+plt.rcParams['axes.labelsize'] = 'medium'
+plt.rcParams['xtick.labelsize'] = 'small'
+plt.rcParams['ytick.labelsize'] = 'small'
+plt.rcParams['legend.fontsize'] = 'small'
+
 
 class FontConfig:
     """统一字体配置类，支持缩放参数"""
@@ -48,7 +60,11 @@ class FontConfig:
     
     @property
     def axis_weight(self) -> str:
-        return 'bold'
+        return 'normal'
+    
+    @property
+    def font_family(self) -> str:
+        return 'serif'  # Times New Roman
 
 
 class IntestinalPrimordiumAnalyzer:
@@ -382,8 +398,8 @@ class IntestinalPrimordiumAnalyzer:
         
         plt.violinplot(data_to_plot, positions=positions, widths=3)
         
-        plt.xlabel("Time (minutes post-fertilization)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
-        plt.ylabel("Internalization Velocity (μm/min)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        plt.xlabel("Time (minutes post-fertilization)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight, fontfamily=self.font_config.font_family)
+        plt.ylabel("Internalization Velocity (μm/min)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight, fontfamily=self.font_config.font_family)
         plt.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
         plt.axhline(y=0, color='black', linestyle='--', alpha=0.5)
         plt.grid(True, alpha=0.3)
@@ -416,19 +432,20 @@ class IntestinalPrimordiumAnalyzer:
             labels=features.keys(),
             colors=colors,
             autopct='%1.1f%%',
-            startangle=45,
-            textprops={'fontsize': self.font_config.legend_size, 'fontweight': 'bold'}
+            startangle=90,
+            textprops={'fontsize': self.font_config.legend_size, 'fontweight': 'normal'}
         )
         
         # Enhance the appearance
         for autotext in autotexts:
             autotext.set_color('white')
             autotext.set_fontsize(self.font_config.legend_size)
-            autotext.set_fontweight('bold')
+            autotext.set_fontweight('normal')
         
         plt.title('Intestinal Morphogenesis Co-clustering Features\nQuantitative Local Geometrical Properties', 
                  fontsize=self.font_config.axis_label_size, 
-                 fontweight=self.font_config.axis_weight, pad=20)
+                 fontweight=self.font_config.axis_weight,
+                 fontfamily=self.font_config.font_family, pad=20)
         
         plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
         
@@ -826,7 +843,8 @@ class DorsalIntercalationAnalyzer:
         )
         ax.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
         ax.set_ylabel("Left Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
-        ax.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        ax.tick_params(axis='y', which='major', labelsize=self.font_config.tick_label_size)
+        ax.tick_params(axis='x', which='major', labelsize=int(self.font_config.tick_label_size * 0.8))  # Smaller x-tick labels
         
         # Update colorbar font size
         cbar = ax.collections[0].colorbar
@@ -858,7 +876,8 @@ class DorsalIntercalationAnalyzer:
         )
         ax.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
         ax.set_ylabel("Right Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
-        ax.tick_params(axis='both', which='major', labelsize=self.font_config.tick_label_size)
+        ax.tick_params(axis='y', which='major', labelsize=self.font_config.tick_label_size)
+        ax.tick_params(axis='x', which='major', labelsize=int(self.font_config.tick_label_size * 0.8))  # Smaller x-tick labels
         
         # Update colorbar font size
         cbar = ax.collections[0].colorbar
@@ -1241,18 +1260,19 @@ class DorsalIntercalationAnalyzer:
             colors=colors,
             autopct='%1.1f%%',
             startangle=90,
-            textprops={'fontsize': self.font_config.legend_size, 'fontweight': 'bold'}
+            textprops={'fontsize': self.font_config.legend_size, 'fontweight': 'normal'}
         )
         
         # Enhance the appearance
         for autotext in autotexts:
             autotext.set_color('white')
             autotext.set_fontsize(self.font_config.legend_size)
-            autotext.set_fontweight('bold')
+            autotext.set_fontweight('normal')
         
         plt.title('Dorsal Intercalation Co-clustering Features\nQuantitative Local Geometrical Properties', 
                  fontsize=self.font_config.axis_label_size, 
-                 fontweight=self.font_config.axis_weight, pad=20)
+                 fontweight=self.font_config.axis_weight, 
+                 fontfamily=self.font_config.font_family, pad=20)
         
         plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
         
