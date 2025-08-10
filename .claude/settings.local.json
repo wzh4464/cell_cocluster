@@ -6,7 +6,8 @@
       "Bash(ls:*)",
       "Bash(echo:*)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(pdflatex:*)"
     ],
     "deny": []
   }

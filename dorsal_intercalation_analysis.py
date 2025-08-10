@@ -686,41 +686,52 @@ class DorsalIntercalationAnalyzer:
         return left_matrix, right_matrix, time_range
 
     def create_demo4_coclustering_data(self):
-        """Create Demo4 co-clustering data with uniform high probability, then overall decline in later time."""
-        # Time range: 220-255 minutes (discrete integer minutes)
-        time_range = np.arange(220, 256)
-        n_cells_total = 12  # Total cells in a single heatmap
+        """Create Demo4 co-clustering data based on real intestinal primordium formation timeline (350-400 minutes)."""
+        # Time range: 350-400 minutes (intestinal morphogenesis period)
+        time_range = np.arange(350, 401)
+        n_cells_total = 20  # 20 E-lineage cells (int1-int9 rings)
         
-        # Create single probability matrix with temporal decline pattern
+        # Create probability matrix based on real intestinal formation phases
         prob_matrix = np.zeros((n_cells_total, len(time_range)))
         
-        # Time periods for clustering with overall decline
-        cluster_rise_start = 225
-        cluster_rise_end = 230
-        cluster_high_start = 230
-        cluster_high_end = 240  # High period ends earlier
-        cluster_decline_start = 240  # Start of decline period
-        cluster_decline_end = 255
+        # Real biological phases based on report.md:
+        gastrulation_start = 350    # 原肠作用开始 (28-cell stage)
+        internalization_start = 355  # Ea/Ep内化开始
+        internalization_peak = 365   # 内化完成，细胞进入囊胚腔
+        proliferation_peak = 375     # E16/E20增殖完成
+        reorganization_peak = 385    # 重组和嵌入活动高峰
+        tube_formation_start = 390   # 管腔形成开始
+        tube_formation_end = 400     # 极化上皮管形成完成
         
         for i in range(n_cells_total):
             for j, t in enumerate(time_range):
-                if cluster_rise_start <= t <= cluster_rise_end:
-                    # 225-230分钟快速上升 - 所有细胞均匀上升
-                    progress = (t - cluster_rise_start) / (cluster_rise_end - cluster_rise_start)
-                    base_prob = 0.2 + 0.75 * progress  # 0.2到0.95
-                elif cluster_high_start < t < cluster_decline_start:
-                    # 230-240分钟保持高概率 - 所有细胞均匀高概率
+                if gastrulation_start <= t < internalization_start:
+                    # 350-355分钟：原肠作用开始，低活动
+                    base_prob = 0.15 + np.random.normal(0, 0.02)
+                elif internalization_start <= t < internalization_peak:
+                    # 355-365分钟：内化期，活动递增
+                    progress = (t - internalization_start) / (internalization_peak - internalization_start)
+                    base_prob = 0.15 + 0.6 * progress  # 0.15到0.75
+                elif internalization_peak <= t < proliferation_peak:
+                    # 365-375分钟：增殖期，继续上升
+                    progress = (t - internalization_peak) / (proliferation_peak - internalization_peak)
+                    base_prob = 0.75 + 0.2 * progress  # 0.75到0.95
+                elif proliferation_peak <= t < reorganization_peak:
+                    # 375-385分钟：重组嵌入高峰期，最高活动
                     base_prob = 0.95 + np.random.normal(0, 0.02)
-                elif cluster_decline_start <= t <= cluster_decline_end:
-                    # 240-255分钟整体概率下降 - 所有细胞一起下降
-                    decline_progress = (t - cluster_decline_start) / (cluster_decline_end - cluster_decline_start)
-                    # 从0.95逐渐下降到0.3
-                    base_prob = 0.95 - 0.65 * decline_progress + np.random.normal(0, 0.03)
+                elif reorganization_peak <= t < tube_formation_start:
+                    # 385-390分钟：开始下降
+                    progress = (t - reorganization_peak) / (tube_formation_start - reorganization_peak)
+                    base_prob = 0.95 - 0.3 * progress  # 0.95到0.65
+                elif tube_formation_start <= t <= tube_formation_end:
+                    # 390-400分钟：管腔形成，活动继续下降
+                    progress = (t - tube_formation_start) / (tube_formation_end - tube_formation_start)
+                    base_prob = 0.65 - 0.35 * progress  # 0.65到0.30
                 else:
-                    # 其他时间低概率
+                    # 其他时间段
                     base_prob = 0.1 + np.random.normal(0, 0.02)
                 
-                # 加入细胞间微小噪声
+                # 加入细胞间微小噪声，但保持E-lineage细胞的同步性
                 noise = np.random.normal(0, 0.03)
                 prob_matrix[i, j] = base_prob + noise
         
@@ -934,17 +945,30 @@ class DorsalIntercalationAnalyzer:
         return save_path
     
     def plot_demo4_coclustering_heatmap(self, save_path: Union[str, Path] = "demo4_coclustering_heatmap.png"):
-        """Generate Demo4 co-clustering probability heatmap with low left/right and high center pattern."""
+        """Generate Demo4 co-clustering probability heatmap for intestinal primordium formation (350-400 min)."""
         prob_matrix, time_range = self.create_demo4_coclustering_data()
         
-        # Create square figure
-        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        # E-lineage cell names from report.md
+        e_cell_names = [
+            "int1DL", "int1VL", "int1DR", "int1VR",  # Ring 1 (4 cells)
+            "int2L", "int2R",                         # Ring 2 (2 cells) 
+            "int3L", "int3R",                         # Ring 3 (2 cells)
+            "int4L", "int4R",                         # Ring 4 (2 cells)
+            "int5L", "int5R",                         # Ring 5 (2 cells)
+            "int6L", "int6R",                         # Ring 6 (2 cells)
+            "int7L", "int7R",                         # Ring 7 (2 cells)
+            "int8L", "int8R",                         # Ring 8 (2 cells)
+            "int9L", "int9R"                          # Ring 9 (2 cells)
+        ]
         
-        # Demo4 heatmap
+        # Create figure
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        
+        # Demo4 intestinal heatmap
         sns.heatmap(
             prob_matrix,
             xticklabels=[str(t) if t % 5 == 0 else "" for t in time_range],
-            yticklabels=[f"C{i+1:02d}" for i in range(prob_matrix.shape[0])],
+            yticklabels=e_cell_names,
             cmap="RdBu_r",
             vmin=0,
             vmax=1,
@@ -952,9 +976,9 @@ class DorsalIntercalationAnalyzer:
             ax=ax,
         )
         ax.set_xlabel("Time (minutes)", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
-        ax.set_ylabel("Dorsal Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
-        ax.tick_params(axis='y', which='major', labelsize=self.font_config.tick_label_size)
-        ax.tick_params(axis='x', which='major', labelsize=int(self.font_config.tick_label_size * 0.8))  # Smaller x-tick labels
+        ax.set_ylabel("E-lineage Cells", fontsize=self.font_config.axis_label_size, fontweight=self.font_config.axis_weight)
+        ax.tick_params(axis='y', which='major', labelsize=int(self.font_config.tick_label_size * 0.9))
+        ax.tick_params(axis='x', which='major', labelsize=int(self.font_config.tick_label_size * 0.8))
         
         # Update colorbar font size
         cbar = ax.collections[0].colorbar
@@ -1386,10 +1410,10 @@ class DorsalIntercalationAnalyzer:
                 output_dir / "Demo2_Dorsal_Cell_Trajectories.png",
                 {"use_demo_data": True},
             ),
-            # New Demo4 with low left/right, high center pattern
+            # New Demo4 - Intestinal Primordium Formation Co-clustering (350-400min)
             "demo4_coclustering": (
                 self.plot_demo4_coclustering_heatmap,
-                output_dir / "Demo4_Center_High_Coclustering_Heatmap.png",
+                output_dir / "Demo4_Intestinal_Primordium_Coclustering_Heatmap.png",
                 {},
             ),
             
